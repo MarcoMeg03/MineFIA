@@ -1,122 +1,238 @@
 import minerl
 import gym
 import cv2
-from pynput import keyboard, mouse
+import json
+import pygame
+import numpy as np
+# import torch
+# import pickle
+import os
 
-# Crea l'ambiente
-env = gym.make("MineRLBasaltFindCave-v0")
-obs = env.reset()
+img_scaling = 0.25
 
-# Configura il writer video
-height, width, _ = obs["pov"].shape
-video = cv2.VideoWriter("manual_episode.mp4", cv2.VideoWriter_fourcc(*'mp4v'), 20.0, (width, height))
+samples = 1
+output_video_path = os.getcwd()
 
-# Variabili per gestire le azioni
-current_action = env.action_space.noop()  # Azione base nulla
-stop_program = False  # Flag per terminare il programma
+for i in range(samples):
+        # Initialize pygame
+    pygame.init()
 
-# Variabili per tracciare la posizione del cursore
-previous_x, previous_y = width // 2, height // 2  # Centro dello schermo
-mouse_sensitivity = 0.2  # Sensibilità del mouse
+    frames = []
+
+    # Constants
+    OUTPUT_VIDEO_FILE = f"./data/InCostruzione/mc-{i}.mp4"
+    ACTION_LOG_FILE = f"./data/InCostruzione/mc-{i}.jsonl"
+    FPS = 30
+    RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
+    screen = pygame.display.set_mode(RESOLUTION)
+    pygame.display.set_caption('Minecraft')
+    SENS = 0.1
+
+    # Set up the OpenCV video writer
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(OUTPUT_VIDEO_FILE, fourcc, FPS, RESOLUTION)
+
+    pygame.mouse.set_visible(False)
+    pygame.mouse.set_pos(screen.get_width() // 2, screen.get_height() // 2)  # Center the mouse
+    pygame.event.set_grab(True)
+
+    prev_mouse_x, prev_mouse_y = pygame.mouse.get_pos()
+
+    # Mapping from pygame key to action
+    key_to_action_mapping = {
+        pygame.K_w: {'forward': 1},
+        pygame.K_s: {'back': 1},
+        pygame.K_a: {'left': 1},
+        pygame.K_d: {'right': 1},
+        pygame.K_SPACE: {'jump': 1},
+        pygame.K_1: {'hotbar.1': 1},
+        pygame.K_2: {'hotbar.2': 1},
+        pygame.K_3: {'hotbar.3': 1},
+        pygame.K_4: {'hotbar.4': 1},
+        pygame.K_5: {'hotbar.5': 1},
+        pygame.K_6: {'hotbar.6': 1},
+        pygame.K_7: {'hotbar.7': 1},
+        pygame.K_8: {'hotbar.8': 1},
+        pygame.K_9: {'hotbar.9': 1},
+        pygame.K_LSHIFT: {'sprint': 1},
+        pygame.K_LCTRL: {'sneak': 1},
+        pygame.K_g: {'drop': 1},
+        pygame.K_e: {'inventory': 1},
+        pygame.K_f: {'swapHands': 1},
+        pygame.K_t: {'pickItem': 1}
+        }
+        # ... movement keys, jump, crouch, sprint, hotbar, attack, use, inventory, drop, swaphands, pickitem
+    # Mapping from mouse button to action
+    mouse_to_action_mapping = {
+        0: {'attack': 1},      # Left mouse button
+        2: {'use': 1}    # Right mouse button
+        # Add more if needed
+    }
+    
+    action_log = []
+
+    # Initialize the Minecraft environment
+    env = gym.make('MineRLBasaltBuildVillageHouse-v0')
 
 
-def on_press(key):
-    global stop_program
+    env.seed(2143)
+    obs = env.reset()
+   
+    done = False
+    tick = 0
+    """
+    # action_space = {"ESC": 0,
+    #          "noop": [], 
+    #          "attack": 0, 
+    #          "back": 0, 
+    #          "drop": 0, 
+    #          "forward": 0, 
+    #          "hotbar.1": 0, 
+    #          "hotbar.2": 0, 
+    #          "hotbar.3": 0, 
+    #          "hotbar.4": 0, 
+    #          "hotbar.5": 0, 
+    #          "hotbar.6": 0, 
+    #          "hotbar.7": 0, 
+    #          "hotbar.8": 0, 
+    #          "hotbar.9": 0, 
+    #          "inventory": 0, 
+    #          "jump": 0, 
+    #          "left": 0, 
+    #          "right": 0, 
+    #          "pickItem": 0, 
+    #          "sneak": 0, 
+    #          "sprint": 0, 
+    #          "swapHands": 0, 
+    #          "use": 0,
+    #          "camera": [0.0, 0.0]}
+    """
     try:
-        if hasattr(key, "char") and key.char:
-            if key.char == 'w':  # Cammina avanti
-                current_action["forward"] = 1
-            elif key.char == 'a':  # Vai a sinistra
-                current_action["left"] = 1
-            elif key.char == 'd':  # Vai a destra
-                current_action["right"] = 1
-            elif key.char == 's':  # Vai indietro
-                current_action["back"] = 1
-            elif key.char == 'e':  # Apri l'inventario
-                current_action["inventory"] = 1
-        # Controllo esplicito per il tasto Spazio
-        if key == keyboard.Key.space:
-            current_action["jump"] = 1
-        # Controllo esplicito per il tasto ESC
-        if key == keyboard.Key.esc:
-            stop_program = True
-    except AttributeError:
+        while not done:
+            # Convert the observation to a format suitable for pygame display
+            image = np.array(obs['pov'])
+            # image = cvtColor(image, cv2)
+            # Record the current frame
+            
+            # print(image.shape)
+            # out_image = cv2.resize(image, (int(360 * img_scaling), int(640 * img_scaling)))
+            out.write(image)
+            # cv2.imshow('temp', image)
+            image = np.flip(image, axis=1)
+            image = np.rot90(image)
+            # image = image * 0.1 # <- brightness
+            image = pygame.surfarray.make_surface(image)
+            screen.blit(image, (0, 0))
+            pygame.display.update()
+        
+            # Get the current state of all keys
+            keys = pygame.key.get_pressed()
+        
+            action = {'noop': []}
+            for key, act in key_to_action_mapping.items():
+                if keys[key]:
+                    action.update(act)
+            
+            # Get mouse button states
+            mouse_buttons = pygame.mouse.get_pressed()
+            for idx, pressed in enumerate(mouse_buttons):
+                if pressed:
+                    action.update(mouse_to_action_mapping.get(idx, {}))
+            
+            # Get mouse movement
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            delta_x = mouse_x - prev_mouse_x
+            delta_y = mouse_y - prev_mouse_y
+        
+            # Reset mouse to the center of the window
+            pygame.mouse.set_pos(screen.get_width() // 2, screen.get_height() // 2)
+            prev_mouse_x, prev_mouse_y = screen.get_width() // 2, screen.get_height() // 2
+        
+            # Now, use delta_x and delta_y for the camera movement
+            action['camera'] = [delta_y * SENS * (-1), delta_x * SENS * (-1)]
+
+            registerAction = {
+                "mouse": {
+                    "x": mouse_x,
+                    "y": mouse_y,
+                    "dx": delta_x,
+                    "dy": delta_y,
+                    "scaledX": delta_x * SENS,
+                    "scaledY": delta_y * SENS,
+                    "buttons": pygame.mouse.get_pressed(),
+                    "newButtons": []  # Puoi aggiungere logica per calcolare i nuovi pulsanti premuti
+                },
+                "keyboard": {
+                    "keys": [pygame.key.name(key) for key, pressed in enumerate(keys) if pressed],
+                    "newKeys": [],  # Puoi calcolare quali tasti sono stati appena premuti
+                    "chars": ""     # Aggiungi eventuali caratteri inseriti
+                },
+                "isGuiOpen": False,  # Modifica secondo necessità
+                "isGuiInventory": False,  # Modifica secondo necessità
+                "hotbar": 1,  # Inserisci il valore corretto se disponibile
+                "yaw": delta_x * SENS,  # Movimento orizzontale della telecamera
+                "pitch": delta_y * SENS,  # Movimento verticale della telecamera
+                "xpos": 0.0,  # Inserisci posizione
+                "ypos": 0.0,  # Inserisci posizione
+                "zpos": 0.0,  # Inserisci posizione
+                "tick": 0,  # Calcola o prendi il valore
+                "milli": pygame.time.get_ticks(),
+                "inventory": [],  # Aggiungi logica per ottenere l'inventario
+                "serverTick": tick,  # Inserisci il valore del tick del server
+                "serverTickDurationMs": 0.0,  # Inserisci il valore corretto
+                "stats": {}  # Aggiungi logica per raccogliere le statistiche
+            }
+
+            # Add the in-game 'ESC' action to the beginning of the action
+            action_log.append(registerAction)
+            tick += 1
+            action = {'ESC': 0, **action}
+
+        
+            # Apply the action in the environment
+            obs, reward, done, _ = env.step(action)
+        
+            # Check if the 'q' key is pressed to terminate the loop
+            if keys[pygame.K_q]:
+                break
+        
+            # Handle pygame events to avoid the window becoming unresponsive
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    done = True
+    except KeyboardInterrupt:
         pass
+    finally:    
+        # env.render()
+        # Cleanup
+        out.release()
+        # cv2.destroyAllWindows()
+        pygame.quit()
+        
+    # Save the actions to a JSONL file
+    with open(ACTION_LOG_FILE, 'w') as f:
+        for action in action_log:
+            f.write(json.dumps(action) + '\n')
 
+    cv2.namedWindow('Recorded Video', cv2.WINDOW_NORMAL)
+    cap = cv2.VideoCapture(OUTPUT_VIDEO_FILE)
 
-def on_release(key):
-    try:
-        if hasattr(key, "char") and key.char:
-            if key.char == 'w':
-                current_action["forward"] = 0
-            elif key.char == 'a':
-                current_action["left"] = 0
-            elif key.char == 'd':
-                current_action["right"] = 0
-            elif key.char == 's':
-                current_action["back"] = 0
-            elif key.char == 'e':
-                current_action["inventory"] = 0
-        # Controllo esplicito per il tasto Spazio
-        if key == keyboard.Key.space:
-            current_action["jump"] = 0
-    except AttributeError:
-        pass
-
-
-def on_click(x, y, button, pressed):
-    if button == mouse.Button.left:
-        current_action["attack"] = 1 if pressed else 0
-    elif button == mouse.Button.right:
-        current_action["use"] = 1 if pressed else 0
-
-
-def on_move(x, y):
-    global previous_x, previous_y, current_action
-
-    # Calcola i delta del mouse rispetto alla posizione precedente
-    dx = (x - previous_x) * mouse_sensitivity
-    dy = (y - previous_y) * mouse_sensitivity
-
-    # Se c'è movimento, aggiorna la visuale
-    if dx != 0 or dy != 0:
-        current_action["camera"] = [dy, dx]
-        # Aggiorna la posizione precedente
-        previous_x, previous_y = x, y
+    if not cap.isOpened():
+        print("Error: Could not open video file.")
     else:
-        # Se non c'è movimento, azzera la camera
-        current_action["camera"] = [0.0, 0.0]
+        # Set the video capture to return grayscale frames
+        # cap.set(cv2.CAP_PROP_CONVERT_RGB, False)
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+            cv2.imshow('Recorded Video', frame)
+            
+            # Adjust the delay for cv2.waitKey() if the playback speed is not correct
+            if cv2.waitKey(int(1000/FPS)) & 0xFF == ord('q'):
+                break
 
-# Listener per tastiera e mouse
-keyboard_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-mouse_listener = mouse.Listener(on_click=on_click, on_move=on_move)
-
-# Avvia i listener
-keyboard_listener.start()
-mouse_listener.start()
-
-# Loop principale
-try:
-    while not stop_program:
-        env.render()
-
-        # Esegui l'azione attuale
-        obs, reward, done, info = env.step(current_action)
-
-        # Salva il frame nel video
-        video.write(cv2.cvtColor(obs["pov"], cv2.COLOR_RGB2BGR))
-
-        # Interruzione del ciclo principale se l'ambiente è completato
-        if done:
-            print("Ambiente completato.")
-            break
-
-finally:
-    env.close()
-    video.release()
-    print("Video salvato in 'manual_episode.mp4'")
-
-    # Ferma i listener
-    keyboard_listener.stop()
-    mouse_listener.stop()
+    cap.release()
+    cv2.destroyAllWindows()
