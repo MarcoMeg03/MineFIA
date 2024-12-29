@@ -74,7 +74,6 @@ for i in range(samples):
     # Initialize the Minecraft environment
     env = gym.make('MineRLBasaltBuildVillageHouse-v0')
 
-
     env.seed(2143)
     obs = env.reset()
    
@@ -107,6 +106,10 @@ for i in range(samples):
     #          "use": 0,
     #          "camera": [0.0, 0.0]}
     """
+    
+    isGuiOpen = False
+    isGuiInventory = False
+
     try:
         while not done:
             # Convert the observation to a format suitable for pygame display
@@ -151,6 +154,15 @@ for i in range(samples):
             # Now, use delta_x and delta_y for the camera movement
             action['camera'] = [delta_y * SENS * (-1), delta_x * SENS * (-1)]
 
+            # Controlla gli eventi
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    done = True
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_e:
+                        isGuiOpen = not isGuiOpen
+                        isGuiInventory = not isGuiInventory
+
             registerAction = {
                 "mouse": {
                     "x": mouse_x,
@@ -167,8 +179,8 @@ for i in range(samples):
                     "newKeys": [],  # Puoi calcolare quali tasti sono stati appena premuti
                     "chars": ""     # Aggiungi eventuali caratteri inseriti
                 },
-                "isGuiOpen": False,  # Modifica secondo necessità
-                "isGuiInventory": False,  # Modifica secondo necessità
+                "isGuiOpen": isGuiOpen,  # Modifica secondo necessità
+                "isGuiInventory": isGuiInventory,  # Modifica secondo necessità
                 "hotbar": 1,  # Inserisci il valore corretto se disponibile
                 "yaw": delta_x * SENS,  # Movimento orizzontale della telecamera
                 "pitch": delta_y * SENS,  # Movimento verticale della telecamera
@@ -196,10 +208,6 @@ for i in range(samples):
             if keys[pygame.K_q]:
                 break
         
-            # Handle pygame events to avoid the window becoming unresponsive
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    done = True
     except KeyboardInterrupt:
         pass
     finally:    
