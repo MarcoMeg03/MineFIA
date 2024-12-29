@@ -75,10 +75,14 @@ for i in range(samples):
     env = gym.make('MineRLBasaltBuildVillageHouse-v0')
 
     env.seed(2143)
+  
     obs = env.reset()
    
     done = False
     tick = 0
+    server_tick = 0
+    server_tick_interval = 50
+    last_server_tick_time = pygame.time.get_ticks()
     """
     # action_space = {"ESC": 0,
     #          "noop": [], 
@@ -109,7 +113,8 @@ for i in range(samples):
     
     isGuiOpen = False
     isGuiInventory = False
-
+    current_hotbar = 1;
+    
     try:
         while not done:
             # Convert the observation to a format suitable for pygame display
@@ -135,6 +140,11 @@ for i in range(samples):
             for key, act in key_to_action_mapping.items():
                 if keys[key]:
                     action.update(act)
+                    # Verifica se l'azione riguarda un cambio di hotbar
+                    if key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, 
+                               pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
+                        # Estrai il numero della hotbar dall'azione
+                        current_hotbar = int(pygame.key.name(key))
             
             # Get mouse button states
             mouse_buttons = pygame.mouse.get_pressed()
@@ -163,6 +173,11 @@ for i in range(samples):
                         isGuiOpen = not isGuiOpen
                         isGuiInventory = not isGuiInventory
 
+            # Calcola il server tick
+            current_time = pygame.time.get_ticks()
+            elapsed_time = current_time - last_server_tick_time  # Tempo trascorso in ms
+            server_tick = elapsed_time // server_tick_interval  # Ogni 50 ms corrisponde a un tick del server
+                
             registerAction = {
                 "mouse": {
                     "x": mouse_x,
@@ -179,19 +194,19 @@ for i in range(samples):
                     "newKeys": [],  # Puoi calcolare quali tasti sono stati appena premuti
                     "chars": ""     # Aggiungi eventuali caratteri inseriti
                 },
-                "isGuiOpen": isGuiOpen,  # Modifica secondo necessità
-                "isGuiInventory": isGuiInventory,  # Modifica secondo necessità
-                "hotbar": 1,  # Inserisci il valore corretto se disponibile
+                "isGuiOpen": isGuiOpen,
+                "isGuiInventory": isGuiInventory,
+                "hotbar": current_hotbar,
                 "yaw": delta_x * SENS,  # Movimento orizzontale della telecamera
                 "pitch": delta_y * SENS,  # Movimento verticale della telecamera
                 "xpos": 0.0,  # Inserisci posizione
                 "ypos": 0.0,  # Inserisci posizione
                 "zpos": 0.0,  # Inserisci posizione
-                "tick": 0,  # Calcola o prendi il valore
-                "milli": pygame.time.get_ticks(),
+                "tick": tick,
+                "milli": current_time,
                 "inventory": [],  # Aggiungi logica per ottenere l'inventario
-                "serverTick": tick,  # Inserisci il valore del tick del server
-                "serverTickDurationMs": 0.0,  # Inserisci il valore corretto
+                "serverTick": server_tick,
+                "serverTickDurationMs": server_tick_interval,
                 "stats": {}  # Aggiungi logica per raccogliere le statistiche
             }
 
