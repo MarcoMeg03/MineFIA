@@ -4,6 +4,18 @@ import glob
 import json
 import argparse
 
+# Funzione per interpretare i valori booleani
+def str_to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value.lower() in {"true", "t", "yes", "y", "1"}:
+        return True
+    elif value.lower() in {"false", "f", "no", "n", "0"}:
+        return False
+    else:
+        raise argparse.ArgumentTypeError(f"Valore booleano invalido: {value}")
+
+
 def mirror_video(input_path, output_path):
     # Apri il video originale
     cap = cv2.VideoCapture(input_path)
@@ -101,11 +113,15 @@ def main():
     parser = argparse.ArgumentParser(description="Specchia video e JSONL.")
     parser.add_argument("--input_folder", type=str, required=True, help="Cartella di input contenente video e JSONL.")
     parser.add_argument("--output_folder", type=str, required=True, help="Cartella di output per i video e JSONL specchiati.")
+    parser.add_argument("--overwrite", type=str_to_bool, default=True, help="Sovrascrive i file specchiati se esistono già (default: True).")
 
     args = parser.parse_args()
 
+    print(f"Overwrite: {args.overwrite}")
+
     input_folder = args.input_folder
     output_folder = args.output_folder
+    overwrite = args.overwrite
 
     os.makedirs(output_folder, exist_ok=True)
 
@@ -116,6 +132,11 @@ def main():
         video_name = os.path.basename(video_path)
         mirrored_video_path = os.path.join(output_folder, f"mirrored_{video_name}")
 
+        # Controlla se il file specchiato esiste già
+        if not overwrite and os.path.exists(mirrored_video_path):
+            print(f"File già specchiato: {mirrored_video_path}, salto...")
+            continue
+
         # Specchia il video
         mirror_video(video_path, mirrored_video_path)
 
@@ -124,12 +145,17 @@ def main():
         input_json_path = os.path.join(input_folder, json_name)
         mirrored_json_path = os.path.join(output_folder, f"mirrored_{json_name}")
 
+        if not overwrite and os.path.exists(mirrored_json_path):
+            print(f"File JSONL già specchiato: {mirrored_json_path}, salto...")
+            continue
+
         if os.path.exists(input_json_path):
             mirror_json(input_json_path, mirrored_json_path, video_path)
         else:
             print(f"Attenzione: JSONL non trovato per {video_name}")
+        
+        #test
+        #break
 
-        #break test
-    
 if __name__ == "__main__":
     main()
