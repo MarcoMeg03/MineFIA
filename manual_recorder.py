@@ -133,9 +133,9 @@ for i in range(samples):
             screen.blit(image, (0, 0))
             pygame.display.update()
         
-            # Get the current state of all keys
             keys = pygame.key.get_pressed()
-        
+
+            # Build the action dictionary
             action = {'noop': []}
             for key, act in key_to_action_mapping.items():
                 if keys[key]:
@@ -145,24 +145,43 @@ for i in range(samples):
                                pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
                         # Estrai il numero della hotbar dall'azione
                         current_hotbar = int(pygame.key.name(key))
-            
-            # Get mouse button states
+
             mouse_buttons = pygame.mouse.get_pressed()
             for idx, pressed in enumerate(mouse_buttons):
                 if pressed:
                     action.update(mouse_to_action_mapping.get(idx, {}))
-            
+
             # Get mouse movement
             mouse_x, mouse_y = pygame.mouse.get_pos()
             delta_x = mouse_x - prev_mouse_x
             delta_y = mouse_y - prev_mouse_y
-        
-            # Reset mouse to the center of the window
+            action["camera"] = [delta_y * SENS * (-1), delta_x * SENS * (-1)]
             pygame.mouse.set_pos(screen.get_width() // 2, screen.get_height() // 2)
             prev_mouse_x, prev_mouse_y = screen.get_width() // 2, screen.get_height() // 2
-        
-            # Now, use delta_x and delta_y for the camera movement
-            action['camera'] = [delta_y * SENS * (-1), delta_x * SENS * (-1)]
+
+
+            # Get keys pressed
+            keys_pressed = [
+                f"key.keyboard.{pygame.key.name(key)}"
+                for key in key_to_action_mapping.keys() if keys[key]
+            ]
+
+            # Calcola `newKeys` confrontando con i tasti del ciclo precedente
+            new_keys_pressed = [key for key in keys_pressed if key not in previous_keys]
+
+            # Aggiorna i tasti precedenti
+            chars = ""
+            previous_keys = keys_pressed.copy()
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    char = event.unicode
+                    if char:
+                        chars += char  # Aggiungi il carattere digitato
+                        key_name = f"key.keyboard.{char.lower()}"
+                        if key_name not in new_keys_pressed:
+                            new_keys_pressed.append(key_name)  # Aggiungi ai nuovi tasti
+                if event.type == pygame.QUIT:
+                    done = True
 
             # Controlla gli eventi
             for event in pygame.event.get():
@@ -190,18 +209,18 @@ for i in range(samples):
                     "newButtons": []  # Puoi aggiungere logica per calcolare i nuovi pulsanti premuti
                 },
                 "keyboard": {
-                    "keys": [pygame.key.name(key) for key, pressed in enumerate(keys) if pressed],
-                    "newKeys": [],  # Puoi calcolare quali tasti sono stati appena premuti
-                    "chars": ""     # Aggiungi eventuali caratteri inseriti
+                    "keys": keys_pressed,
+                    "newKeys": new_keys_pressed,
+                    "chars": chars
                 },
                 "isGuiOpen": isGuiOpen,
                 "isGuiInventory": isGuiInventory,
                 "hotbar": current_hotbar,
                 "yaw": delta_x * SENS,  # Movimento orizzontale della telecamera
                 "pitch": delta_y * SENS,  # Movimento verticale della telecamera
-                "xpos": 0.0,  # Inserisci posizione
-                "ypos": 0.0,  # Inserisci posizione
-                "zpos": 0.0,  # Inserisci posizione
+                "xpos": obs.get("xpos", 0.0),
+                "ypos": obs.get("ypos", 0.0),
+                "zpos": obs.get("zpos", 0.0),
                 "tick": tick,
                 "milli": current_time,
                 "inventory": [],  # Aggiungi logica per ottenere l'inventario
