@@ -113,7 +113,7 @@ for i in range(samples):
     
     isGuiOpen = False
     isGuiInventory = False
-    current_hotbar = 1;
+    current_hotbar = 0;
     
     try:
         while not done:
@@ -144,7 +144,7 @@ for i in range(samples):
                     if key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, 
                                pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
                         # Estrai il numero della hotbar dall'azione
-                        current_hotbar = int(pygame.key.name(key))
+                        current_hotbar = int(pygame.key.name(key)) - 1
 
             mouse_buttons = pygame.mouse.get_pressed()
             for idx, pressed in enumerate(mouse_buttons):
@@ -202,6 +202,28 @@ for i in range(samples):
                         "type": str(item_name),  # Nome oggetto
                         "quantity": int(quantity)  # Quantità
                     })
+                    
+            # Variabili per tracciare i tasti del mouse
+            current_buttons = []  # Pulsanti attualmente premuti
+            new_buttons = []  # Pulsanti appena premuti
+
+            # Mappa personalizzata per i pulsanti del mouse
+            mouse_button_mapping = {
+                0: 0,  # Tasto sinistro
+                2: 1   # Tasto destro
+            }
+
+            # Conversione in formato richiesto
+            for idx, pressed in enumerate(mouse_buttons):
+                if pressed and idx in mouse_button_mapping:
+                    current_buttons.append(mouse_button_mapping[idx])  # Aggiungi il pulsante mappato
+
+            # Calcola `newButtons` confrontando con i pulsanti del frame precedente
+            if 'previous_buttons' in locals():
+                new_buttons = [btn for btn in current_buttons if btn not in previous_buttons]
+
+            # Aggiorna i pulsanti del frame precedente
+            previous_buttons = current_buttons.copy()
                 
             registerAction = {
                 "mouse": {
@@ -211,8 +233,8 @@ for i in range(samples):
                     "dy": delta_y,
                     "scaledX": delta_x * SENS,
                     "scaledY": delta_y * SENS,
-                    "buttons": pygame.mouse.get_pressed(),
-                    "newButtons": []
+                    "buttons": current_buttons,
+                    "newButtons": new_buttons
                 },
                 "keyboard": {
                     "keys": keys_pressed,
