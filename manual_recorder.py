@@ -26,7 +26,7 @@ for i in range(samples):
     RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
     pygame.display.set_caption('Minecraft')
-    SENS = 0.2
+    SENS = 0.3
 
     # Set up the OpenCV video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -124,7 +124,7 @@ for i in range(samples):
             
             # print(image.shape)
             # out_image = cv2.resize(image, (int(360 * img_scaling), int(640 * img_scaling)))
-            out.write(image)
+            out.write(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
             # cv2.imshow('temp', image)
             image = np.flip(image, axis=1)
             image = np.rot90(image)
