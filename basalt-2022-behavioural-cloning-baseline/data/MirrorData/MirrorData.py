@@ -129,7 +129,7 @@ def main():
         else:
             print(f"Attenzione: JSONL non trovato per {video_name}")
 
-        break #test
+        #break test
     
 if __name__ == "__main__":
     main()
