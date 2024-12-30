@@ -26,7 +26,7 @@ for i in range(samples):
     RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
     pygame.display.set_caption('Minecraft')
-    SENS = 0.1
+    SENS = 0.2
 
     # Set up the OpenCV video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -72,7 +72,7 @@ for i in range(samples):
     action_log = []
 
     # Initialize the Minecraft environment
-    env = gym.make('MineRLBasaltBuildVillageHouse-v0')
+    env = gym.make('MineRLObtainDiamondShovel-v0')
 
     env.seed(2143)
   
@@ -169,25 +169,19 @@ for i in range(samples):
             # Calcola `newKeys` confrontando con i tasti del ciclo precedente
             new_keys_pressed = [key for key in keys_pressed if key not in previous_keys]
 
-            # Aggiorna i tasti precedenti
+            # Aggiorna i tasti precedenti, gestisce l'apertura e la chiusura della GUI e il tasto quit
             chars = ""
             previous_keys = keys_pressed.copy()
             for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN:
+                if event.type == pygame.QUIT:
+                    done = True
+                elif event.type == pygame.KEYDOWN:
                     char = event.unicode
                     if char:
                         chars += char  # Aggiungi il carattere digitato
                         key_name = f"key.keyboard.{char.lower()}"
                         if key_name not in new_keys_pressed:
                             new_keys_pressed.append(key_name)  # Aggiungi ai nuovi tasti
-                if event.type == pygame.QUIT:
-                    done = True
-
-            # Controlla gli eventi
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    done = True
-                elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_e:
                         isGuiOpen = not isGuiOpen
                         isGuiInventory = not isGuiInventory
@@ -196,6 +190,18 @@ for i in range(samples):
             current_time = pygame.time.get_ticks()
             elapsed_time = current_time - last_server_tick_time  # Tempo trascorso in ms
             server_tick = elapsed_time // server_tick_interval  # Ogni 50 ms corrisponde a un tick del server
+            
+            # Converte l'inventario nel formato richiesto
+            inventory_data = obs.get('inventory', {})
+            formatted_inventory = []
+
+            # Itera sull'inventario e formatta gli oggetti con quantità >= 1
+            for item_name, quantity in inventory_data.items():
+                if int(quantity) >= 1:  # Controlla se la quantità è >= 1
+                    formatted_inventory.append({
+                        "type": str(item_name),  # Nome oggetto
+                        "quantity": int(quantity)  # Quantità
+                    })
                 
             registerAction = {
                 "mouse": {
@@ -206,7 +212,7 @@ for i in range(samples):
                     "scaledX": delta_x * SENS,
                     "scaledY": delta_y * SENS,
                     "buttons": pygame.mouse.get_pressed(),
-                    "newButtons": []  # Puoi aggiungere logica per calcolare i nuovi pulsanti premuti
+                    "newButtons": []
                 },
                 "keyboard": {
                     "keys": keys_pressed,
@@ -223,7 +229,7 @@ for i in range(samples):
                 "zpos": obs.get("zpos", 0.0),
                 "tick": tick,
                 "milli": current_time,
-                "inventory": [],  # Aggiungi logica per ottenere l'inventario
+                "inventory": formatted_inventory,
                 "serverTick": server_tick,
                 "serverTickDurationMs": server_tick_interval,
                 "stats": {}  # Aggiungi logica per raccogliere le statistiche
@@ -233,7 +239,6 @@ for i in range(samples):
             action_log.append(registerAction)
             tick += 1
             action = {'ESC': 0, **action}
-
         
             # Apply the action in the environment
             obs, reward, done, _ = env.step(action)
