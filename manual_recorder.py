@@ -14,14 +14,14 @@ samples = 1
 output_video_path = os.getcwd()
 
 for i in range(samples):
-        # Initialize pygame
+    # Initialize pygame
     pygame.init()
 
     frames = []
 
     # Constants
-    OUTPUT_VIDEO_FILE = f"./data/InCostruzione/mc-{i}.mp4"
-    ACTION_LOG_FILE = f"./data/InCostruzione/mc-{i}.jsonl"
+    OUTPUT_VIDEO_FILE = f"./basalt-2022-behavioural-cloning-baseline/data/InCostruzione/mc-{i}.mp4"
+    ACTION_LOG_FILE = f"./basalt-2022-behavioural-cloning-baseline/data/InCostruzione/mc-{i}.jsonl"
     FPS = 30
     RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
@@ -60,8 +60,8 @@ for i in range(samples):
         pygame.K_e: {'inventory': 1},
         pygame.K_f: {'swapHands': 1},
         pygame.K_t: {'pickItem': 1}
-        }
-        # ... movement keys, jump, crouch, sprint, hotbar, attack, use, inventory, drop, swaphands, pickitem
+    }
+    # ... movement keys, jump, crouch, sprint, hotbar, attack, use, inventory, drop, swaphands, pickitem
     # Mapping from mouse button to action
     mouse_to_action_mapping = {
         0: {'attack': 1},      # Left mouse button
@@ -113,7 +113,7 @@ for i in range(samples):
     
     isGuiOpen = False
     isGuiInventory = False
-    current_hotbar = 0;
+    current_hotbar = 0
     
     try:
         while not done:

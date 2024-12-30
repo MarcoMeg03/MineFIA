@@ -1,0 +1,2 @@
+//wsl.localhost/Ubuntu/home/giusopo/AI/MineFIA/basalt-2022-behavioural-cloning-baseline/data/VPT-models/foundation-model-1x.model filter=lfs diff=lfs merge=lfs -text
+//wsl.localhost/Ubuntu/home/giusopo/AI/MineFIA/basalt-2022-behavioural-cloning-baseline/data/VPT-models/foundation-model-1x.weights filter=lfs diff=lfs merge=lfs -text
