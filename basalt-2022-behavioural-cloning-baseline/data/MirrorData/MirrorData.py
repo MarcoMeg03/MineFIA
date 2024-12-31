@@ -57,7 +57,7 @@ def mirror_video(input_path, output_path):
 def mirror_json(input_json_path, output_json_path, video_path):
     # Trova la larghezza del video
     cap = cv2.VideoCapture(video_path)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    width = 1280 #dimensione dello schermo
     cap.release()
 
     with open(input_json_path, "r") as infile:
