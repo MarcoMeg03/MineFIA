@@ -20,8 +20,8 @@ for i in range(samples):
     frames = []
 
     # Constants
-    OUTPUT_VIDEO_FILE = f"./basalt-2022-behavioural-cloning-baseline/data/InCostruzione/mc-{i}.mp4"
-    ACTION_LOG_FILE = f"./basalt-2022-behavioural-cloning-baseline/data/InCostruzione/mc-{i}.jsonl"
+    OUTPUT_VIDEO_FILE = f"./data/InCostruzione/mc-{i}.mp4"
+    ACTION_LOG_FILE = f"./data/InCostruzione/mc-{i}.jsonl"
     FPS = 30
     RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
