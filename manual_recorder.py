@@ -18,20 +18,21 @@ for i in range(samples):
 
     frames = []
 
-    file_base_name = generate_file_name()
+    file_base_name = f"generato_FIA_{i}_{generate_file_name()}"
     
     # Constants
     OUTPUT_VIDEO_FILE = f"./data/InCostruzione/{file_base_name}.mp4"
     ACTION_LOG_FILE = f"./data/InCostruzione/{file_base_name}.jsonl"
     FPS = 30
-    RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
+    RESOLUTION = (1080, 640)  # Resolution at which to capture and save the video
+    VIDEO_OUT_RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
     pygame.display.set_caption('Minecraft')
     SENS = 0.3
 
     # Set up the OpenCV video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(OUTPUT_VIDEO_FILE, fourcc, FPS, RESOLUTION)
+    out = cv2.VideoWriter(OUTPUT_VIDEO_FILE, fourcc, FPS, VIDEO_OUT_RESOLUTION)
 
     pygame.mouse.set_visible(False)
     pygame.mouse.set_pos(screen.get_width() // 2, screen.get_height() // 2)  # Center the mouse
@@ -130,7 +131,8 @@ for i in range(samples):
             image = np.flip(image, axis=1)
             image = np.rot90(image)
             # image = image * 0.1 # <- brightness
-            image = pygame.surfarray.make_surface(image)
+            display_image = cv2.resize(image,(640,1080))
+            image = pygame.surfarray.make_surface(display_image)
             screen.blit(image, (0, 0))
             pygame.display.update()
         
