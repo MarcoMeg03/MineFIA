@@ -76,7 +76,7 @@ for i in range(samples):
     # Initialize the Minecraft environment
     env = gym.make('MineRLObtainDiamondShovel-v0')
 
-    env.seed(2143)
+    #env.seed(2143)
   
     obs = env.reset()
    
