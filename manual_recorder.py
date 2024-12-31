@@ -24,7 +24,7 @@ for i in range(samples):
     OUTPUT_VIDEO_FILE = f"./data/InCostruzione/{file_base_name}.mp4"
     ACTION_LOG_FILE = f"./data/InCostruzione/{file_base_name}.jsonl"
     FPS = 30
-    RESOLUTION = (1080, 640)  # Resolution at which to capture and save the video
+    RESOLUTION = (1280, 720)  # Resolution at which to capture and save the video
     VIDEO_OUT_RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
     pygame.display.set_caption('Minecraft')
@@ -39,7 +39,7 @@ for i in range(samples):
     pygame.event.set_grab(True)
 
     prev_mouse_x, prev_mouse_y = pygame.mouse.get_pos()
-
+    reg_mouse_x, reg_mouse_y = (screen.get_width() // 2, screen.get_height() // 2)
     # Mapping from pygame key to action
     key_to_action_mapping = {
         pygame.K_w: {'forward': 1},
@@ -131,7 +131,7 @@ for i in range(samples):
             image = np.flip(image, axis=1)
             image = np.rot90(image)
             # image = image * 0.1 # <- brightness
-            display_image = cv2.resize(image,(640,1080))
+            display_image = cv2.resize(image,(720,1280))
             image = pygame.surfarray.make_surface(display_image)
             screen.blit(image, (0, 0))
             pygame.display.update()
@@ -161,7 +161,8 @@ for i in range(samples):
             action["camera"] = [delta_y * SENS * (-1), delta_x * SENS * (-1)]
             pygame.mouse.set_pos(screen.get_width() // 2, screen.get_height() // 2)
             prev_mouse_x, prev_mouse_y = screen.get_width() // 2, screen.get_height() // 2
-
+            reg_mouse_x = reg_mouse_x + delta_x
+            reg_mouse_y = reg_mouse_y + delta_y
 
             # Get keys pressed
             keys_pressed = [
@@ -230,8 +231,8 @@ for i in range(samples):
                 
             registerAction = {
                 "mouse": {
-                    "x": mouse_x,
-                    "y": mouse_y,
+                    "x": reg_mouse_x,
+                    "y": reg_mouse_y,
                     "dx": delta_x,
                     "dy": delta_y,
                     "scaledX": delta_x * SENS,
