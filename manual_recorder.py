@@ -4,9 +4,8 @@ import cv2
 import json
 import pygame
 import numpy as np
-# import torch
-# import pickle
 import os
+from generate_file_utils import generate_file_name
 
 img_scaling = 0.25
 
@@ -19,9 +18,11 @@ for i in range(samples):
 
     frames = []
 
+    file_base_name = generate_file_name()
+    
     # Constants
-    OUTPUT_VIDEO_FILE = f"./data/InCostruzione/mc-{i}.mp4"
-    ACTION_LOG_FILE = f"./data/InCostruzione/mc-{i}.jsonl"
+    OUTPUT_VIDEO_FILE = f"./data/InCostruzione/{file_base_name}.mp4"
+    ACTION_LOG_FILE = f"./data/InCostruzione/{file_base_name}.jsonl"
     FPS = 30
     RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
