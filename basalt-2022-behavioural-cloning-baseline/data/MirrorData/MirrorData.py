@@ -109,6 +109,9 @@ def mirror_json(input_json_path, output_json_path, video_path):
     print(f"JSONL specchiato salvato in: {output_json_path}")
 
 def main():
+    # specchiare i dati del nostro dataset nella stessa cartella
+    # python3 MirrorData.py --input_folder ../MineRLBasaltFindWood-v0 --output_folder ../MineRLBasaltFindWood-v0
+
     # Parser per gli argomenti da riga di comando
     parser = argparse.ArgumentParser(description="Specchia video e JSONL.")
     parser.add_argument("--input_folder", type=str, required=True, help="Cartella di input contenente video e JSONL.")
@@ -130,6 +133,14 @@ def main():
 
     for video_path in video_paths:
         video_name = os.path.basename(video_path)
+
+        # Se un file inizia con "mirorred_" è un file già sepcchiato e non bisogna operarci
+        # condizione utile quanto input_folder == output_folder
+        # evita di specchiare un file già specchiato
+        if video_name.startswith("mirrored_"):
+            print(f"File specchiato rilevato e saltato: {video_name}")
+            continue
+
         mirrored_video_path = os.path.join(output_folder, f"mirrored_{video_name}")
 
         # Controlla se il file specchiato esiste già
