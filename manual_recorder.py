@@ -18,7 +18,7 @@ for i in range(samples):
 
     frames = []
 
-    file_base_name = f"generato_FIA_{i}_{generate_file_name()}"
+    file_base_name = f"FIA_{generate_file_name()}"
     
     # Constants
     OUTPUT_VIDEO_FILE = f"./data/InCostruzione/{file_base_name}.mp4"
@@ -281,7 +281,7 @@ for i in range(samples):
         out.release()
         # cv2.destroyAllWindows()
         pygame.quit()
-        
+
     # Save the actions to a JSONL file
     with open(ACTION_LOG_FILE, 'w') as f:
         for action in action_log:
