@@ -143,8 +143,23 @@ def composite_images_with_alpha(image1, image2, alpha, x, y):
     cw = max(0, min(image1.shape[1] - x, image2.shape[1]))
     if ch == 0 or cw == 0:
         return
-    alpha = alpha[:ch, :cw]
-    image1[y:y + ch, x:x + cw, :] = (image1[y:y + ch, x:x + cw, :] * (1 - alpha) + image2[:ch, :cw, :] * alpha).astype(np.uint8)
+    
+    try:
+        alpha = alpha[:ch, :cw]
+        image1[y:y + ch, x:x + cw, :] = (
+            image1[y:y + ch, x:x + cw, :] * (1 - alpha) + image2[:ch, :cw, :] * alpha
+        ).astype(np.uint8)
+    except ValueError as e:
+        # Stampa l'errore e le coordinate in caso di problemi
+        print(f"Error during compositing: {str(e)}")
+        print(f"Coordinates and dimensions:")
+        print(f"  - x: {x}, y: {y}")
+        print(f"  - ch: {ch}, cw: {cw}")
+        print(f"  - image1.shape: {image1.shape}")
+        print(f"  - image2.shape: {image2.shape}")
+        print(f"  - alpha.shape: {alpha.shape}")
+        # Continua senza interrompere
+        pass
 
 
 def data_loader_worker(tasks_queue, output_queue, quit_workers_event):
