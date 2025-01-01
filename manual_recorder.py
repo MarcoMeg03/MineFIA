@@ -28,7 +28,7 @@ for i in range(samples):
     VIDEO_OUT_RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
     pygame.display.set_caption('Minecraft')
-    SENS = 0.3
+    SENS = 0.25
 
     # Set up the OpenCV video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -40,6 +40,8 @@ for i in range(samples):
 
     prev_mouse_x, prev_mouse_y = pygame.mouse.get_pos()
     reg_mouse_x, reg_mouse_y = (screen.get_width() // 2, screen.get_height() // 2)
+    reg_mouse_x_gui_open, reg_mouse_y_gui_open = (screen.get_width() // 2, screen.get_height() // 2)
+
     # Mapping from pygame key to action
     key_to_action_mapping = {
         pygame.K_w: {'forward': 1},
@@ -132,8 +134,8 @@ for i in range(samples):
             image = np.rot90(image)
             # image = image * 0.1 # <- brightness
             display_image = cv2.resize(image,(720,1280))
-            image = pygame.surfarray.make_surface(display_image)
-            screen.blit(image, (0, 0))
+            display_image = pygame.surfarray.make_surface(display_image)
+            screen.blit(display_image, (0, 0))
             pygame.display.update()
         
             keys = pygame.key.get_pressed()
@@ -161,8 +163,19 @@ for i in range(samples):
             action["camera"] = [delta_y * SENS * (-1), delta_x * SENS * (-1)]
             pygame.mouse.set_pos(screen.get_width() // 2, screen.get_height() // 2)
             prev_mouse_x, prev_mouse_y = screen.get_width() // 2, screen.get_height() // 2
-            reg_mouse_x = reg_mouse_x + delta_x
-            reg_mouse_y = reg_mouse_y + delta_y
+
+            if isGuiOpen:
+                # Aggiorna le coordinate GUI-specifiche
+                reg_mouse_x_gui_open += delta_x * SENS
+                reg_mouse_y_gui_open += delta_y * SENS
+
+                # Limita le coordinate del cursore alla finestra
+                reg_mouse_x_gui_open = max(0, min(reg_mouse_x_gui_open, RESOLUTION[0] - 1))
+                reg_mouse_y_gui_open = max(0, min(reg_mouse_y_gui_open, RESOLUTION[1] - 1))
+            else:
+                # Aggiorna le coordinate normali
+                reg_mouse_x += delta_x * SENS
+                reg_mouse_y += delta_y * SENS    
 
             # Get keys pressed
             keys_pressed = [
@@ -189,6 +202,8 @@ for i in range(samples):
                     if event.key == pygame.K_e:
                         isGuiOpen = not isGuiOpen
                         isGuiInventory = not isGuiInventory
+                        reg_mouse_x, reg_mouse_y = (screen.get_width() // 2, screen.get_height() // 2)
+                        reg_mouse_x_gui_open, reg_mouse_y_gui_open = (screen.get_width() // 2, screen.get_height() // 2)
 
             # Calcola il server tick
             current_time = pygame.time.get_ticks()
@@ -231,8 +246,8 @@ for i in range(samples):
                 
             registerAction = {
                 "mouse": {
-                    "x": reg_mouse_x,
-                    "y": reg_mouse_y,
+                    "x": reg_mouse_x_gui_open if isGuiOpen else reg_mouse_x,
+                    "y": reg_mouse_y_gui_open if isGuiOpen else reg_mouse_y,
                     "dx": delta_x,
                     "dy": delta_y,
                     "scaledX": delta_x * SENS,
