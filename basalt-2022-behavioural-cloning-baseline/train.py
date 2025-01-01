@@ -1,7 +1,7 @@
 from behavioural_cloning import behavioural_cloning_train
 
 def main():
-    print("===Training FindCave model===")
+    print("===Training Find wood model===")
     behavioural_cloning_train(
         data_dir="data/MineRLBasaltFindWood-v0",
         in_model="data/VPT-models/foundation-model-1x.model",
