@@ -4,50 +4,60 @@ import cv2
 
 def is_inventory_useful(inventory):
     """
-    Verifica se l'inventario contiene solo oggetti utili.
+    Verifica se l'inventario contiene solo oggetti utili o è vuoto.
     """
-    useful_items = {"crafting_table", "birch_planks", "oak_planks", "birch_log", "oak_log"}
+    useful_items = {
+        "crafting_table",
+        "oak_planks", "birch_planks", "spruce_planks", "jungle_planks", "acacia_planks", "dark_oak_planks",
+        "oak_log", "birch_log", "spruce_log", "jungle_log", "acacia_log", "dark_oak_log"
+    }
+    # L'inventario è utile se è vuoto o contiene solo oggetti della lista
     return all(item["type"] in useful_items for item in inventory)
-
 
 def get_cut_timestamp(jsonl_path):
     """
     Legge un file JSONL e restituisce il tick e il tempo relativo in cui tagliare il video.
     """
-    with open(jsonl_path, "r") as f:
-        lines = f.readlines()
+    try:
+        with open(jsonl_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+    except UnicodeDecodeError as e:
+        print(f"Errore di decodifica UTF-8 alla posizione {e.start}. Prova a verificare l'encoding del file.")
+        return None, None, False
 
-    last_useful_tick = None
-    last_useful_time = None
     first_milli = None
     average_server_tick_duration = 0
+    first_inventory_check = True
+    is_useful = True
 
     for line in lines:
         data = json.loads(line)
 
-        # Calcola il tempo relativo al primo frame
         if first_milli is None:
             first_milli = data["milli"]
 
-        # Calcola la durata media del tick
-        server_tick_duration = data.get("serverTickDurationMs", 50.0)  # Default 50ms
+        server_tick_duration = data.get("serverTickDurationMs", 50.0)
         average_server_tick_duration = (average_server_tick_duration + server_tick_duration) / 2
 
-        # Verifica se l'inventario è utile
         inventory = data.get("inventory", [])
+
+        # Se il primo inventario è già inutile, scartiamo il video
+        if first_inventory_check:
+            is_useful = is_inventory_useful(inventory)
+            first_inventory_check = False
+            if not is_useful:
+                print(f"Video inizia con un inventario non utile: {inventory}")
+                return None, None, False
+
         if not is_inventory_useful(inventory):
-            print(f"Inventario non utile trovato: {inventory}")
+            cut_tick = data["tick"]
+            cut_time = (data["milli"] - first_milli) / 1000.0
+            print(f"Inventario non utile trovato a tick {cut_tick}: {inventory}")
+            print(f"Tempo relativo: {cut_time} secondi")
+            return cut_tick, cut_time, True
 
-            # Salva l'ultimo tick utile
-            last_useful_tick = data["tick"]
-            last_useful_time = (data["tick"] * average_server_tick_duration) / 1000.0  # Tempo relativo in secondi
-            print(f"Inventario utile a tick {last_useful_tick}: {inventory}")
-
-            break
-        
-    print(f"Ultimo tick utile: {last_useful_tick}, tempo relativo: {last_useful_time}")
-    return last_useful_tick, last_useful_time
-
+    print("Tutti i tick contengono inventari utili.")
+    return None, None, True
 
 def trim_video(video_path, output_path, cut_time):
     """
@@ -59,17 +69,14 @@ def trim_video(video_path, output_path, cut_time):
         print(f"Errore nell'aprire il video: {video_path}")
         return
 
-    # Ottieni le proprietà del video
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Calcola il numero di frame da tagliare
     cut_frame = int(cut_time * fps)
     print(f"FPS: {fps}, Frame totali: {total_frames}, Frame di taglio: {cut_frame}")
 
-    # Configura il writer per il video tagliato
     codec = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, codec, fps, (width, height))
 
@@ -82,20 +89,21 @@ def trim_video(video_path, output_path, cut_time):
         out.write(frame)
         current_frame += 1
 
-    # Rilascia risorse
     cap.release()
     out.release()
     print(f"Video tagliato salvato in: {output_path}")
-
     return cut_frame
-
 
 def trim_jsonl(jsonl_path, output_jsonl_path, max_tick):
     """
     Taglia il file JSONL fino al tick specificato.
     """
-    with open(jsonl_path, "r") as infile:
-        lines = infile.readlines()
+    try:
+        with open(jsonl_path, "r", encoding="utf-8", errors="ignore") as infile:
+            lines = infile.readlines()
+    except UnicodeDecodeError as e:
+        print(f"Errore di decodifica UTF-8 alla posizione {e.start}.")
+        return
 
     trimmed_lines = []
     for line in lines:
@@ -104,11 +112,10 @@ def trim_jsonl(jsonl_path, output_jsonl_path, max_tick):
             break
         trimmed_lines.append(line)
 
-    with open(output_jsonl_path, "w") as outfile:
+    with open(output_jsonl_path, "w", encoding="utf-8") as outfile:
         outfile.writelines(trimmed_lines)
 
     print(f"JSONL tagliato salvato in: {output_jsonl_path}")
-
 
 def process_videos(input_folder, output_folder):
     """
@@ -116,7 +123,6 @@ def process_videos(input_folder, output_folder):
     """
     os.makedirs(output_folder, exist_ok=True)
 
-    # Trova tutti i file video e JSONL
     video_paths = [f for f in os.listdir(input_folder) if f.endswith(".mp4")]
     for video_name in video_paths:
         jsonl_name = video_name.replace(".mp4", ".jsonl")
@@ -127,22 +133,23 @@ def process_videos(input_folder, output_folder):
             print(f"JSONL non trovato per {video_name}, salto...")
             continue
 
-        # Ottieni il tick e il tempo di taglio
-        last_tick, cut_time = get_cut_timestamp(jsonl_path)
+        last_tick, cut_time, is_useful = get_cut_timestamp(jsonl_path)
+
+        if not is_useful:
+            print(f"Scartato video {video_name} per contenere oggetti non utili sin dall'inizio.")
+            continue
 
         if cut_time is None or last_tick is None:
             print(f"Nessun taglio necessario per {video_name}, salto...")
             continue
 
-        # Taglia il video e salva nella cartella di output
         output_video_path = os.path.join(output_folder, f"trimmed_{video_name}")
         cut_frame = trim_video(video_path, output_video_path, cut_time)
 
-        # Taglia il JSONL e salva nella cartella di output
         output_jsonl_path = os.path.join(output_folder, f"trimmed_{jsonl_name}")
         trim_jsonl(jsonl_path, output_jsonl_path, last_tick)
 
 if __name__ == "__main__":
-    input_folder = "../DataTest"
+    input_folder = "../FindDiamondsVideo"
     output_folder = "../CuttedVideos"
     process_videos(input_folder, output_folder)
