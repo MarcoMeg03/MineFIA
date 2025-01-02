@@ -17,19 +17,21 @@ from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
 from data_loader import DataLoader
 from openai_vpt.lib.tree_util import tree_map
 
+import pandas as pd
+
 # Originally this code was designed for a small dataset of ~20 demonstrations per task.
 # The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
 # Use this flag to switch between the two settings
-USING_FULL_DATASET = False;
+USING_FULL_DATASET = False
 
-EPOCHS = 1 if USING_FULL_DATASET else 2
+EPOCHS = 1 if USING_FULL_DATASET else 1
 # Needs to be <= number of videos
 BATCH_SIZE = 64 if USING_FULL_DATASET else 4
 # Ideally more than batch size to create
 # variation in datasets (otherwise, you will
 # get a bunch of consecutive samples)
 # Decrease this (and batch_size) if you run out of memory
-N_WORKERS = 100 if USING_FULL_DATASET else 5
+N_WORKERS = 100 if USING_FULL_DATASET else 4
 DEVICE = "cpu"
 
 LOSS_REPORT_RATE = 100
@@ -38,7 +40,7 @@ LOSS_REPORT_RATE = 100
 LEARNING_RATE = 0.000181
 # OpenAI VPT BC weight decay
 # WEIGHT_DECAY = 0.039428
-WEIGHT_DECAY = 0.0
+WEIGHT_DECAY = 0.039428
 # KL loss to the original model was not used in OpenAI VPT
 KL_LOSS_WEIGHT = 1.0
 MAX_GRAD_NORM = 5.0
@@ -56,8 +58,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
     # To create model with the right environment.
-    # All basalt environments have the same settings, so any of them works here
-    env = gym.make("MineRLBasaltFindCave-v0")
+    env = gym.make("MineRLObtainDiamondShovel-v0")
     agent = MineRLAgent(env, device=DEVICE, policy_kwargs=agent_policy_kwargs, pi_head_kwargs=agent_pi_head_kwargs)
     agent.load_weights(in_weights)
 
@@ -97,6 +98,11 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
     start_time = time.time()
 
+    # Nome del file Excel
+    log_file = "training_loss_log.xlsx"
+    # Inizializza il file Excel con le intestazioni
+    pd.DataFrame(columns=["Time", "Batches", "Average Loss"]).to_excel(log_file, index=False)
+
     # Keep track of the hidden state per episode/trajectory.
     # DataLoader provides unique id for each episode, which will
     # be different even for the same trajectory when it is loaded
@@ -127,9 +133,9 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
             for key, value in minerl_action_transformed.items():
                 if isinstance(value, np.ndarray) and np.all(value == 1):  # Verifica se tutti gli elementi sono 1
                     print(f"{key}: {value}", end=", ")
-                    
-            print(" ");
-    
+
+            print(" ")
+
             agent_obs = agent._env_obs_to_agent({"pov": image})
             if episode_id not in episode_hidden_states:
                 episode_hidden_states[episode_id] = policy.initial_state(1)
@@ -141,6 +147,8 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
                 dummy_first
             )
 
+            log_prob  = policy.get_logprob_of_action(pi_distribution, agent_action)
+
             with th.no_grad():
                 original_pi_distribution, _, _ = original_policy.get_output_for_observation(
                     agent_obs,
@@ -148,17 +156,19 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
                     dummy_first
                 )
 
-            log_prob  = policy.get_logprob_of_action(pi_distribution, agent_action)
+            log_prob = policy.get_logprob_of_action(pi_distribution, agent_action)
             kl_div = policy.get_kl_of_action_dists(pi_distribution, original_pi_distribution)
 
             # Make sure we do not try to backprop through sequence
             # (fails with current accumulation)
+
             new_agent_state = tree_map(lambda x: x.detach(), new_agent_state)
             episode_hidden_states[episode_id] = new_agent_state
 
             # Finally, update the agent to increase the probability of the
             # taken action.
             # Remember to take mean over batch losses
+
             loss = (-log_prob + KL_LOSS_WEIGHT * kl_div) / BATCH_SIZE
             batch_loss += loss.item()
             loss.backward()
@@ -170,7 +180,15 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         loss_sum += batch_loss
         if batch_i % LOSS_REPORT_RATE == 0:
             time_since_start = time.time() - start_time
-            print(f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {loss_sum / LOSS_REPORT_RATE:.4f}")
+            avg_loss = loss_sum / LOSS_REPORT_RATE
+            log_message = f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {avg_loss:.4f}"
+            print(log_message)  # Stampa sul terminale
+
+            # Scrivi direttamente nel file Excel
+            new_row = pd.DataFrame([{"Time": time_since_start, "Batches": batch_i, "Average Loss": avg_loss}])
+            with pd.ExcelWriter(log_file, mode="a", if_sheet_exists="overlay", engine="openpyxl") as writer:
+                new_row.to_excel(writer, index=False, header=False, startrow=writer.sheets["Sheet1"].max_row)
+
             loss_sum = 0
 
         if batch_i > MAX_BATCHES:
