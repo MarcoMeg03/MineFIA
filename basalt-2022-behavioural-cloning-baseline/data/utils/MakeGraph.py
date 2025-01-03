@@ -6,7 +6,7 @@ file_path = "../../training_loss_log.xlsx"
 df = pd.read_excel(file_path)
 
 # Estrarre i dati di interesse
-time = df["Time"]
+time = df["Time (s)"]  
 avg_loss = df["Average Loss"]
 
 # Creare il grafico
@@ -22,8 +22,8 @@ plt.ylabel("Perdita Media (Loss)", fontsize=12)
 plt.grid(True)
 plt.legend()
 
-# Mostrare il grafico
-plt.show()
-
 # Salvare il grafico come immagine
 plt.savefig("loss_trend.png")
+
+# Mostrare il grafico
+plt.show()
