@@ -215,9 +215,8 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
     env.close()
 
     # Salva i pesi aggiornati
-    with open("ppo_updated_weights_rmsprop.weights", "wb") as f:
-        pickle.dump(agent.policy.state_dict(), f)
-
+    state_dict = agent.policy.state_dict()
+    th.save(state_dict, "ppo_updated_weights_rmsprop.weights")
 
 if __name__ == "__main__":
     parser = ArgumentParser("PPO Reinforcement Learning Execution with RMSProp")
