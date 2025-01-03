@@ -18,13 +18,17 @@ from data_loader import DataLoader
 from openai_vpt.lib.tree_util import tree_map
 
 import pandas as pd
+import time
+from openpyxl import Workbook
+from openpyxl import load_workbook
+from openpyxl.chart import LineChart, Reference
 
 # Originally this code was designed for a small dataset of ~20 demonstrations per task.
 # The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
 # Use this flag to switch between the two settings
 USING_FULL_DATASET = False
 
-EPOCHS = 1 if USING_FULL_DATASET else 1
+EPOCHS = 1 if USING_FULL_DATASET else 2
 # Needs to be <= number of videos
 BATCH_SIZE = 64 if USING_FULL_DATASET else 4
 # Ideally more than batch size to create
@@ -40,7 +44,7 @@ LOSS_REPORT_RATE = 100
 LEARNING_RATE = 0.000181
 # OpenAI VPT BC weight decay
 # WEIGHT_DECAY = 0.039428
-WEIGHT_DECAY = 0.039428
+WEIGHT_DECAY = 0.0
 # KL loss to the original model was not used in OpenAI VPT
 KL_LOSS_WEIGHT = 1.0
 MAX_GRAD_NORM = 5.0
@@ -98,10 +102,14 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
     start_time = time.time()
 
-    # Nome del file Excel
+    # File Excel
     log_file = "training_loss_log.xlsx"
-    # Inizializza il file Excel con le intestazioni
-    pd.DataFrame(columns=["Time", "Batches", "Average Loss"]).to_excel(log_file, index=False)
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Training Data"
+    sheet.append(["Time (s)", "Average Loss", "Batches"])  
+    workbook.save(log_file)
+
 
     # Keep track of the hidden state per episode/trajectory.
     # DataLoader provides unique id for each episode, which will
@@ -112,7 +120,9 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
     loss_sum = 0
     for batch_i, (batch_images, batch_actions, batch_episode_id) in enumerate(data_loader):
+
         batch_loss = 0
+
         for image, action, episode_id in zip(batch_images, batch_actions, batch_episode_id):
             if image is None and action is None:
                 # A work-item was done. Remove hidden state
@@ -184,10 +194,11 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
             log_message = f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {avg_loss:.4f}"
             print(log_message)  # Stampa sul terminale
 
-            # Scrivi direttamente nel file Excel
-            new_row = pd.DataFrame([{"Time": time_since_start, "Batches": batch_i, "Average Loss": avg_loss}])
-            with pd.ExcelWriter(log_file, mode="a", if_sheet_exists="overlay", engine="openpyxl") as writer:
-                new_row.to_excel(writer, index=False, header=False, startrow=writer.sheets["Sheet1"].max_row)
+            # Scrivi i dati nel file Excel
+            workbook = load_workbook(log_file)
+            sheet = workbook["Training Data"]
+            sheet.append([time_since_start, avg_loss, batch_i])  
+            workbook.save(log_file)
 
             loss_sum = 0
 
@@ -196,6 +207,23 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
     state_dict = policy.state_dict()
     th.save(state_dict, out_weights)
+
+    # Aggiunta del grafico interattivo
+    workbook = load_workbook(log_file)
+    sheet = workbook["Training Data"]
+    chart = LineChart()
+    chart.title = "Loss Trend"
+    chart.x_axis.title = "Time (s)"
+    chart.y_axis.title = "Average Loss"
+
+    data = Reference(sheet, min_col=2, min_row=2, max_row=sheet.max_row)  
+    categories = Reference(sheet, min_col=1, min_row=2, max_row=sheet.max_row)  
+    chart.add_data(data, titles_from_data=False)
+    chart.set_categories(categories)
+
+    # Posizionamento del grafico
+    sheet.add_chart(chart, "E5")
+    workbook.save(log_file)
 
 if __name__ == "__main__":
     parser = ArgumentParser()
