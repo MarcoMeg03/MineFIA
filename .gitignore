@@ -4,4 +4,3 @@ __pycache__/
 *.log
 /basalt-2022-behavioural-cloning-baseline/data/CuttedVideos
 /basalt-2022-behavioural-cloning-baseline/data/FindDiamondsVideo
-/basalt-2022-behavioural-cloning-baseline/data/MineRLBasaltFindWood-v0
