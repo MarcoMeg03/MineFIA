@@ -1,13 +1,15 @@
 from argparse import ArgumentParser
 import pickle
-
-import pandas as pd
 import os
 import aicrowd_gym
 import minerl
 import torch as th
 import numpy as np
 from collections import deque
+import matplotlib
+matplotlib.use("TkAgg")  # Usa il backend interattivo TkAgg
+import matplotlib.pyplot as plt
+import pandas as pd
 
 from openai_vpt.agent import MineRLAgent
 
@@ -114,141 +116,92 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
     agent = MineRLAgent(env, policy_kwargs=policy_kwargs, pi_head_kwargs=pi_head_kwargs)
     agent.load_weights(weights)
 
-    # Congela tutti i parametri del modello
-    for param in agent.policy.parameters():
-        param.requires_grad = False
-        
-    # Sblocca i parametri del `pi_head` (responsabili della distribuzione delle azioni)
-    for param in agent.policy.pi_head.parameters():
-        param.requires_grad = True
+    # Variabili per monitorare la reward cumulativa
+    cumulative_rewards = []  # Salva la reward cumulativa per ogni episodio
 
-    # Istanziamento dell'ottimizzatore
-    optimizer = th.optim.RMSprop(
-        filter(lambda p: p.requires_grad, agent.policy.parameters()), 
-        lr=0.00001, 
-        alpha=0.99, 
-        eps=1e-8
-    )
-    
-    # Istanziamento dello scheduler
-    scheduler = th.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.9)
- 
-    gamma = 0.99  # Sconto per reward futura
+    plt.ion()  # Abilita il grafico interattivo
+    fig, ax = plt.subplots()
+    ax.set_title("Reward Cumulativa in Tempo Reale")
+    ax.set_xlabel("Passo")
+    ax.set_ylabel("Reward Cumulativa")
+    line, = ax.plot([], [], label="Reward Cumulativa")
+    plt.legend()
+    plt.grid(True)
 
-    for _ in range(n_episodes):
+    for episode in range(n_episodes):
         obs = env.reset()
         prev_inventory = {key: 0 for key in MATERIAL_REWARDS.keys()}
         
-        jump_window = deque(maxlen=20)  # Finestra mobile per i salti
-        inventory_reward_given = False  # Flag per la reward di inventario
-        isInventoryOpen = False
-        
         cumulative_episode_reward = 0
-        cumulative_reward = 0
-        step = 0 #serve per il file excel di log
+        episode_rewards = []  # Salva le reward per ogni passo
+        steps = []  # Salva i passi per il grafico
 
-        batch_rewards = []
-        batch_log_probs = []
-        batch_advantages = []
+        # Crea una cartella per l'episodio
+        episode_dir = f"./data/Stats/RLTranding_reward/episode{episode + 1}"
+        os.makedirs(episode_dir, exist_ok=True)
 
         for step in range(max_steps):
             action = agent.get_action(obs)
             action["ESC"] = 0
             obs, _, done, _ = env.step(action)
             
-            # Aggiungi un'esplorazione casuale
-            if np.random.rand() < 0.10:  # 10% di probabilità di azione casuale
-                action = env.action_space.sample()
-            
-            # Aggiorna la finestra dei salti
-            jump_window.append(action.get("jump", 0))
-    
             # Calcola la reward basata sull'inventario
             inventory = obs["inventory"]
-            material_reward = compute_reward(inventory, prev_inventory)
-            action_reward, inventory_reward_given = action_based_reward(action, inventory, jump_window, inventory_reward_given)
-            reward = material_reward + action_reward
-
-            # Accumula la reward per valutare l'episodio
+            reward = compute_reward(inventory, prev_inventory)
             cumulative_episode_reward += reward
             
+            # Aggiorna i dati per il grafico
+            steps.append(step + 1)
+            episode_rewards.append(cumulative_episode_reward)
+
+            # **Aggiorna i dati del grafico senza rigenerare la finestra**
+            line.set_xdata(steps)
+            line.set_ydata(episode_rewards)
+            ax.relim()  # Ricalcola i limiti dell'asse
+            ax.autoscale_view()  # Adatta la vista agli aggiornamenti
+            fig.canvas.draw_idle()  # Aggiorna il canvas in modo efficiente
+            plt.pause(0.01)  # Introduce una breve pausa per permettere il rendering
+
             # Aggiorna lo stato dell'inventario
-            if action.get("inventory", 0) == 1:
-                isInventoryOpen = not isInventoryOpen
-                if not isInventoryOpen:
-                    inventory_reward_given = False  # Reset quando l'inventario si chiude
-                
             prev_inventory = {key: inventory.get(key, 0) for key in MATERIAL_REWARDS.keys()}
 
-            # Ottieni la distribuzione e l'azione trasformata
-            output = agent.policy.get_output_for_observation(
-                agent._env_obs_to_agent(obs),
-                agent.policy.initial_state(1),
-                th.tensor([False])
-            )
-
-            pd = output[0]  # Distribuzione delle probabilità
-            ac = agent._env_action_to_agent(action, to_torch=True, check_if_null=False)
-
-            # Calcola il log_prob e la perdita
-            log_prob = agent.policy.get_logprob_of_action(pd, ac)
-            advantage = reward + gamma * log_prob.detach().mean() - log_prob.mean()
-            advantage = normalize(advantage)
-            
-            # Accumula i valori batch-wise
-            batch_rewards.append(reward)
-            batch_log_probs.append(log_prob)
-            batch_advantages.append(advantage)
-
-            epsilon = 0.2  # Parametro di clipping (valore tipico: 0.1-0.3)
-
-            if reward != 0 and (step + 1) % 10 == 0:
-                # Reward cumulativa
-                cumulative_reward = sum(batch_rewards)
-                
-                # Converte in tensori
-                batch_log_probs = th.stack(batch_log_probs)
-                batch_advantages = th.stack(batch_advantages)
-                
-                print(f"Reward cumulativa ultimi 10 passi: {cumulative_reward} \n")
-                #log_to_excel(step, cumulative_reward) #ho commentato perchè triggerava sempre il warning
-                #step += 1
-
-                # Calcolo del rapporto r_t e applicazione del clipping
-                r_t = th.exp(batch_log_probs - batch_log_probs.detach())
-                clipped_ratio = th.clamp(r_t, 1 - epsilon, 1 + epsilon)
-                loss = -th.min(r_t * batch_advantages, clipped_ratio * batch_advantages).mean()
-
-                # Backpropagation e aggiornamento
-                optimizer.zero_grad()
-                loss.backward()
-                th.nn.utils.clip_grad_norm_(agent.policy.parameters(), max_norm=1.0)
-                optimizer.step()
-                scheduler.step()  # Aggiorna il learning rate dopo ogni batch
-
-                # Reset dei batch
-                batch_rewards = []
-                batch_log_probs = []
-                batch_advantages = []
-                
-            elif (step + 1) % 10 == 0:
-                # Reset dei batch
-                batch_rewards = []
-                batch_log_probs = []
-                batch_advantages = []
-                
             if show:
                 env.render()
             if done:
                 break
-                
-        print(f"Reward cumulativa per l'episodio: {cumulative_episode_reward}")
-        
+
+        # Salva dati e grafico per l'episodio
+        df = pd.DataFrame({"Passo": steps, "Reward Cumulativa": episode_rewards})
+        episode_excel_file = os.path.join(episode_dir, f"episode_{episode + 1}_rewards.xlsx")
+        df.to_excel(episode_excel_file, index=False)
+
+        episode_graph_file = os.path.join(episode_dir, f"episode_{episode + 1}_reward_graph.png")
+        plt.figure()
+        plt.plot(steps, episode_rewards, marker='o', label=f"Episode {episode + 1}")
+        plt.title(f"Andamento Reward Cumulativa - Episodio {episode + 1}")
+        plt.xlabel("Passo")
+        plt.ylabel("Reward Cumulativa")
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(episode_graph_file)
+        plt.close()
+
+        print(f"Episodio {episode + 1}/{n_episodes} - Reward cumulativa: {cumulative_episode_reward}")
+        cumulative_rewards.append(cumulative_episode_reward)
+
     env.close()
 
-    # Salva i pesi aggiornati
-    state_dict = agent.policy.state_dict()
-    th.save(state_dict, "ppo_updated_weights_rmsprop.weights")
+    # Genera il grafico complessivo per tutti gli episodi
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, n_episodes + 1), cumulative_rewards, marker='o', label="Reward Cumulativa Totale")
+    plt.title("Andamento della Reward Cumulativa per Tutti gli Episodi", fontsize=14)
+    plt.xlabel("Episodio", fontsize=12)
+    plt.ylabel("Reward Cumulativa", fontsize=12)
+    plt.grid(True)
+    plt.legend()
+    plt.savefig("./data/Stats/RLTranding_reward/cumulative_reward_trend_all_episodes.png")
+    plt.show()
+
 
 if __name__ == "__main__":
     parser = ArgumentParser("PPO Reinforcement Learning Execution with RMSProp")
