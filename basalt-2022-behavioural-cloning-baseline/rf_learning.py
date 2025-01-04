@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
 import pickle
 
+import pandas as pd
+import os
 import aicrowd_gym
 import minerl
 import torch as th
@@ -9,6 +11,9 @@ from collections import deque
 
 from openai_vpt.agent import MineRLAgent
 
+# Nome del file Excel
+EXCEL_FILE = "reward_log.xlsx"
+
 # Funzione per calcolare la reward in base ai materiali
 MATERIAL_REWARDS = {
     "birch_log": 1.2,
@@ -16,6 +21,11 @@ MATERIAL_REWARDS = {
     "jungle_log": 1.2,
     "oak_log": 1.2,
     "spruce_log": 1.2,
+    "dark_oak_planks": 1.5,
+    "jungle_planks": 1.5,
+    "oak_planks": 1.5,
+    "spruce_planks": 1.5,
+    "crafting_table": 2.0,  # Ricompensa per creare una crafting table
     "dirt": -0.2,
     "gravel": -0.5,
     "sand": -0.3
@@ -76,6 +86,25 @@ def normalize(tensor):
         return tensor  # Restituisci il tensore originale senza normalizzare
     return (tensor - tensor.mean()) / (tensor.std() + 1e-8)
 
+def log_to_excel(step, cumulative_reward):
+    # Controlla se il file esiste
+    if os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE)
+    else:
+        # Crea un nuovo DataFrame se il file non esiste
+        df = pd.DataFrame(columns=["Step", "Cumulative Reward"])
+
+    # Crea un DataFrame per i nuovi dati
+    new_data = pd.DataFrame({"Step": [step], "Cumulative Reward": [cumulative_reward]})
+    
+    # Usa pd.concat per aggiungere i nuovi dati
+    df = pd.concat([df, new_data], ignore_index=True)
+    
+    # Scrivi i dati nel file Excel
+    df.to_excel(EXCEL_FILE, index=False)
+
+
+
 def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
     env = aicrowd_gym.make(env)
     agent_parameters = pickle.load(open(model, "rb"))
@@ -116,7 +145,8 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
         
         cumulative_episode_reward = 0
         cumulative_reward = 0
-        
+        step = 0 #serve per il file excel di log
+
         batch_rewards = []
         batch_log_probs = []
         batch_advantages = []
@@ -129,7 +159,7 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
             # Aggiungi un'esplorazione casuale
             if np.random.rand() < 0.10:  # 10% di probabilità di azione casuale
                 action = env.action_space.sample()
-
+            
             # Aggiorna la finestra dei salti
             jump_window.append(action.get("jump", 0))
     
@@ -181,6 +211,8 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
                 batch_advantages = th.stack(batch_advantages)
                 
                 print(f"Reward cumulativa ultimi 10 passi: {cumulative_reward} \n")
+                #log_to_excel(step, cumulative_reward) #ho commentato perchè triggerava sempre il warning
+                #step += 1
 
                 # Calcolo del rapporto r_t e applicazione del clipping
                 r_t = th.exp(batch_log_probs - batch_log_probs.detach())
