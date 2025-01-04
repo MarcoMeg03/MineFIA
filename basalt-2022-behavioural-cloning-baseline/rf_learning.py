@@ -1,20 +1,16 @@
 from argparse import ArgumentParser
 import pickle
 import os
+import matplotlib.pyplot as plt
+import pandas as pd
+
 import aicrowd_gym
 import minerl
 import torch as th
 import numpy as np
 from collections import deque
-import matplotlib
-matplotlib.use("TkAgg")  # Usa il backend interattivo TkAgg
-import matplotlib.pyplot as plt
-import pandas as pd
 
 from openai_vpt.agent import MineRLAgent
-
-# Nome del file Excel
-EXCEL_FILE = "reward_log.xlsx"
 
 # Funzione per calcolare la reward in base ai materiali
 MATERIAL_REWARDS = {
@@ -27,7 +23,7 @@ MATERIAL_REWARDS = {
     "jungle_planks": 1.5,
     "oak_planks": 1.5,
     "spruce_planks": 1.5,
-    "crafting_table": 2.0,  # Ricompensa per creare una crafting table
+    "crafting_table": 2.0, 
     "dirt": -0.2,
     "gravel": -0.5,
     "sand": -0.3
@@ -35,7 +31,8 @@ MATERIAL_REWARDS = {
 
 # Configurazione per monitorare i salti
 JUMP_THRESHOLD = 10
-JUMP_WINDOW = 20  # Numero massimo di passi da considerare
+# Numero massimo di passi da considerare
+JUMP_WINDOW = 20 
 
 # Normalizzazione della reward
 def compute_reward(inventory, prev_inventory):
@@ -88,25 +85,6 @@ def normalize(tensor):
         return tensor  # Restituisci il tensore originale senza normalizzare
     return (tensor - tensor.mean()) / (tensor.std() + 1e-8)
 
-def log_to_excel(step, cumulative_reward):
-    # Controlla se il file esiste
-    if os.path.exists(EXCEL_FILE):
-        df = pd.read_excel(EXCEL_FILE)
-    else:
-        # Crea un nuovo DataFrame se il file non esiste
-        df = pd.DataFrame(columns=["Step", "Cumulative Reward"])
-
-    # Crea un DataFrame per i nuovi dati
-    new_data = pd.DataFrame({"Step": [step], "Cumulative Reward": [cumulative_reward]})
-    
-    # Usa pd.concat per aggiungere i nuovi dati
-    df = pd.concat([df, new_data], ignore_index=True)
-    
-    # Scrivi i dati nel file Excel
-    df.to_excel(EXCEL_FILE, index=False)
-
-
-
 def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
     env = aicrowd_gym.make(env)
     agent_parameters = pickle.load(open(model, "rb"))
@@ -116,54 +94,138 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
     agent = MineRLAgent(env, policy_kwargs=policy_kwargs, pi_head_kwargs=pi_head_kwargs)
     agent.load_weights(weights)
 
-    # Variabili per monitorare la reward cumulativa
-    cumulative_rewards = []  # Salva la reward cumulativa per ogni episodio
-
-    plt.ion()  # Abilita il grafico interattivo
+    # Configura il grafico interattivo
+    plt.ion()
     fig, ax = plt.subplots()
     ax.set_title("Reward Cumulativa in Tempo Reale")
-    ax.set_xlabel("Passo")
+    ax.set_xlabel("Passi")
     ax.set_ylabel("Reward Cumulativa")
     line, = ax.plot([], [], label="Reward Cumulativa")
     plt.legend()
     plt.grid(True)
 
+    # Congela tutti i parametri del modello
+    for param in agent.policy.parameters():
+        param.requires_grad = False
+        
+    # Sblocca i parametri del `pi_head` (responsabili della distribuzione delle azioni)
+    for param in agent.policy.pi_head.parameters():
+        param.requires_grad = True
+
+    optimizer = th.optim.RMSprop(
+        filter(lambda p: p.requires_grad, agent.policy.parameters()), 
+        lr=0.00001, 
+        alpha=0.99, 
+        eps=1e-8
+    )
+    scheduler = th.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.9)
+    gamma = 0.99  # Sconto per reward futura
+
+    cumulative_rewards = []  # Reward cumulativa per ogni episodio
     for episode in range(n_episodes):
         obs = env.reset()
         prev_inventory = {key: 0 for key in MATERIAL_REWARDS.keys()}
+        
+        jump_window = deque(maxlen=20)
+        inventory_reward_given = False
+        isInventoryOpen = False
         
         cumulative_episode_reward = 0
         episode_rewards = []  # Salva le reward per ogni passo
         steps = []  # Salva i passi per il grafico
 
-        # Crea una cartella per l'episodio
         episode_dir = f"./data/Stats/RLTranding_reward/episode{episode + 1}"
         os.makedirs(episode_dir, exist_ok=True)
+
+        batch_rewards = []
+        batch_log_probs = []
+        batch_advantages = []
 
         for step in range(max_steps):
             action = agent.get_action(obs)
             action["ESC"] = 0
             obs, _, done, _ = env.step(action)
-            
+
+            # Aggiungi un'esplorazione casuale
+            if np.random.rand() < 0.10: # 10% di probabilità di azione casuale
+                action = env.action_space.sample()
+
+            # Aggiorna la finestra dei salti
+            jump_window.append(action.get("jump", 0))
+    
             # Calcola la reward basata sull'inventario
             inventory = obs["inventory"]
-            reward = compute_reward(inventory, prev_inventory)
+            material_reward = compute_reward(inventory, prev_inventory)
+            action_reward, inventory_reward_given = action_based_reward(action, inventory, jump_window, inventory_reward_given)
+            reward = material_reward + action_reward
+            # Accumula la reward per valutare l'episodio
             cumulative_episode_reward += reward
-            
+
+             # Aggiorna lo stato dell'inventario
+            if action.get("inventory", 0) == 1:
+                isInventoryOpen = not isInventoryOpen
+                if not isInventoryOpen:
+                    inventory_reward_given = False  # Reset quando l'inventario si chiude
+
             # Aggiorna i dati per il grafico
             steps.append(step + 1)
             episode_rewards.append(cumulative_episode_reward)
 
-            # **Aggiorna i dati del grafico senza rigenerare la finestra**
+            # Aggiorna il grafico interattivo
+            print(f"step: {step} reward: {reward}")
             line.set_xdata(steps)
             line.set_ydata(episode_rewards)
-            ax.relim()  # Ricalcola i limiti dell'asse
-            ax.autoscale_view()  # Adatta la vista agli aggiornamenti
-            fig.canvas.draw_idle()  # Aggiorna il canvas in modo efficiente
-            plt.pause(0.01)  # Introduce una breve pausa per permettere il rendering
+            ax.relim()
+            ax.autoscale_view()
+            fig.canvas.draw_idle()
+            plt.pause(0.01)
 
-            # Aggiorna lo stato dell'inventario
             prev_inventory = {key: inventory.get(key, 0) for key in MATERIAL_REWARDS.keys()}
+
+            # Ottieni la distribuzione e l'azione trasformata
+            da = agent.policy.get_output_for_observation(
+                agent._env_obs_to_agent(obs),
+                agent.policy.initial_state(1),
+                th.tensor([False])
+            )[0]
+            ac = agent._env_action_to_agent(action, to_torch=True, check_if_null=False)
+
+            # Calcola il log_prob e la perdita
+            log_prob = agent.policy.get_logprob_of_action(da, ac)
+            advantage = reward + gamma * log_prob.detach().mean() - log_prob.mean()
+            advantage = normalize(advantage)
+
+            # Accumula i valori batch-wise
+            batch_rewards.append(reward)
+            batch_log_probs.append(log_prob)
+            batch_advantages.append(advantage)
+
+            epsilon = 0.2  # Parametro di clipping (valore tipico: 0.1-0.3)
+
+            if reward != 0 and (step + 1) % 10 == 0:
+                cumulative_reward = sum(batch_rewards)
+                # Converte in tensori
+                batch_log_probs = th.stack(batch_log_probs)
+                batch_advantages = th.stack(batch_advantages)
+
+                print(f"Reward cumulativa ultimi 10 passi: {cumulative_reward} \n")
+
+                # Calcolo del rapporto r_t e applicazione del clipping
+                r_t = th.exp(batch_log_probs - batch_log_probs.detach())
+                clipped_ratio = th.clamp(r_t, 1 - epsilon, 1 + epsilon)
+                loss = -th.min(r_t * batch_advantages, clipped_ratio * batch_advantages).mean()
+
+                # Backpropagation e aggiornamento
+                optimizer.zero_grad()
+                loss.backward()
+                th.nn.utils.clip_grad_norm_(agent.policy.parameters(), max_norm=1.0)
+                optimizer.step()
+                scheduler.step() # Aggiorna il learning rate dopo ogni batch
+
+                # Reset dei batch
+                batch_rewards = []
+                batch_log_probs = []
+                batch_advantages = []
 
             if show:
                 env.render()
@@ -188,10 +250,10 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
 
         print(f"Episodio {episode + 1}/{n_episodes} - Reward cumulativa: {cumulative_episode_reward}")
         cumulative_rewards.append(cumulative_episode_reward)
-
+        
     env.close()
 
-    # Genera il grafico complessivo per tutti gli episodi
+    # Grafico complessivo
     plt.figure(figsize=(10, 6))
     plt.plot(range(1, n_episodes + 1), cumulative_rewards, marker='o', label="Reward Cumulativa Totale")
     plt.title("Andamento della Reward Cumulativa per Tutti gli Episodi", fontsize=14)
@@ -202,6 +264,8 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
     plt.savefig("./data/Stats/RLTranding_reward/cumulative_reward_trend_all_episodes.png")
     plt.show()
 
+    state_dict = agent.policy.state_dict()
+    th.save(state_dict, "ppo_updated_weights_rmsprop.weights")
 
 if __name__ == "__main__":
     parser = ArgumentParser("PPO Reinforcement Learning Execution with RMSProp")

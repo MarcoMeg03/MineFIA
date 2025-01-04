@@ -10,7 +10,7 @@ from openai_vpt.agent import MineRLAgent
 
 def main(model, weights, env, n_episodes=1, max_steps=int(1e9), show=True):
 
-    #Imposta a True per avviare una simulazione di 10 episodi da 1500 steps con log dell'inventario 
+    # Imposta a True per avviare una simulazione di 10 episodi da 1500 steps con log dell'inventario
     TEST_x10_1500_STEP = False
 
     # Using aicrowd_gym is important! Your submission will not work otherwise
@@ -24,7 +24,7 @@ def main(model, weights, env, n_episodes=1, max_steps=int(1e9), show=True):
 
     agent.load_weights(weights)
 
-    screen = pygame.display.set_mode((1280,720))
+    screen = pygame.display.set_mode((1280, 720))
     pygame.display.set_caption('Minecraft agent')
 
     if TEST_x10_1500_STEP:
@@ -34,11 +34,21 @@ def main(model, weights, env, n_episodes=1, max_steps=int(1e9), show=True):
     for _ in range(n_episodes):
 
         obs = env.reset()
-        env.seed(7011)
+        #env.seed(7011)
 
         for _ in range(max_steps):
-            action = agent.get_action(obs)
+            # Gestione degli eventi per controllare l'input utente
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    env.close()
+                    pygame.quit()
+                    exit()
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_q:  # Controlla se il tasto Q è premuto
+                    env.close()
+                    pygame.quit()
+                    exit()
 
+            action = agent.get_action(obs)
 
             # ESC is not part of the predictions model.
             # For baselines, we just set it to zero.
@@ -53,7 +63,7 @@ def main(model, weights, env, n_episodes=1, max_steps=int(1e9), show=True):
                 image = np.flip(image, axis=1)  # Specchia orizzontalmente
                 image = np.rot90(image)  # Ruota di 90°
                 image = cv2.resize(image, (720, 1280))  # Cambia la risoluzione
-                image = image.astype(np.uint8) 
+                image = image.astype(np.uint8)
 
                 # Rendering
                 surface = pygame.surfarray.make_surface(image)
@@ -61,7 +71,7 @@ def main(model, weights, env, n_episodes=1, max_steps=int(1e9), show=True):
                 pygame.display.update()
             if done:
                 break
-        
+
         if TEST_x10_1500_STEP:
             inventory = obs["inventory"]
             available_items = {item: int(quantity) for item, quantity in inventory.items() if quantity > 0}
@@ -72,9 +82,7 @@ def main(model, weights, env, n_episodes=1, max_steps=int(1e9), show=True):
                 print(f"{item}: {quantity}")
             print("------------------- esito -------------------")
 
-            
     env.close()
-
 
 if __name__ == "__main__":
     parser = ArgumentParser("Run pretrained models on MineRL environment")
