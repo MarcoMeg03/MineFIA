@@ -16,7 +16,7 @@ def str_to_bool(value):
         raise argparse.ArgumentTypeError(f"Valore booleano invalido: {value}")
 
 
-def mirror_video(input_path, output_path):
+def mirror_video(input_path, output_path, json_data):
     # Apri il video originale
     cap = cv2.VideoCapture(input_path)
 
@@ -38,26 +38,30 @@ def mirror_video(input_path, output_path):
     # Configura il writer per salvare il video specchiato
     out = cv2.VideoWriter(output_path, codec, fps, (width, height))
 
+    frame_index = 0
     while True:
         ret, frame = cap.read()
-
         if not ret:
             break
 
-        # Specchia il frame orizzontalmente
-        mirrored_frame = cv2.flip(frame, 1)
-        # Scrivi il frame nel nuovo video
+        # Controlla isGuiOpen per decidere se specchiare il frame
+        if frame_index < len(json_data) and not json_data[frame_index].get("isGuiOpen", False):
+            mirrored_frame = cv2.flip(frame, 1)  # Specchia solo se isGuiOpen è False
+        else:
+            mirrored_frame = frame  # Non specchiare se isGuiOpen è True
+
         out.write(mirrored_frame)
+        frame_index += 1
 
     # Chiudi tutto
     cap.release()
     out.release()
     print(f"Video specchiato salvato in: {output_path}")
 
+
 def mirror_json(input_json_path, output_json_path, video_path):
-    # Trova la larghezza del video
     cap = cv2.VideoCapture(video_path)
-    width = 1280 #dimensione dello schermo
+    width = 1280  # Dimensione dello schermo
     cap.release()
 
     with open(input_json_path, "r") as infile:
@@ -67,52 +71,44 @@ def mirror_json(input_json_path, output_json_path, video_path):
     for line in lines:
         data = json.loads(line)
 
-        # Specchia il movimento della telecamera o del mouse
-        if "mouse" in data:
-            # Inverti i movimenti orizzontali
-            data["mouse"]["dx"] = -data["mouse"]["dx"]
-            data["mouse"]["scaledX"] = -data["mouse"]["scaledX"]
-            data["mouse"]["x"] = width - data["mouse"]["x"]
+        # Specchia solo se isGuiOpen è False
+        if not data.get("isGuiOpen", False):
+            if "mouse" in data:
+                data["mouse"]["dx"] = -data["mouse"]["dx"]
+                data["mouse"]["scaledX"] = -data["mouse"]["scaledX"]
+                data["mouse"]["x"] = width - data["mouse"]["x"]
 
-        # Scambia i movimenti sinistra/destra se necessario
-        if "keyboard" in data and "keys" in data["keyboard"]:
-            keys = data["keyboard"]["keys"]
-            new_keys = []
-            new_chars = []  # Per aggiornare il valore di chars
-            for key in keys:
-                if key == "key.keyboard.a":
-                    new_keys.append("key.keyboard.d")
-                    new_chars.append("d")
-                elif key == "key.keyboard.d":
-                    new_keys.append("key.keyboard.a")
-                    new_chars.append("a")
-                else:
-                    new_keys.append(key)
-                    if "chars" in data["keyboard"]:
-                        new_chars.append(data["keyboard"]["chars"])
+            if "keyboard" in data and "keys" in data["keyboard"]:
+                keys = data["keyboard"]["keys"]
+                new_keys = []
+                new_chars = []
+                for key in keys:
+                    if key == "key.keyboard.a":
+                        new_keys.append("key.keyboard.d")
+                        new_chars.append("d")
+                    elif key == "key.keyboard.d":
+                        new_keys.append("key.keyboard.a")
+                        new_chars.append("a")
+                    else:
+                        new_keys.append(key)
+                        if "chars" in data["keyboard"]:
+                            new_chars.append(data["keyboard"]["chars"])
 
-            # Aggiorna keys e chars
-            data["keyboard"]["keys"] = new_keys
-            if "chars" in data["keyboard"]:
-                data["keyboard"]["chars"] = "".join(new_chars)
+                data["keyboard"]["keys"] = new_keys
+                if "chars" in data["keyboard"]:
+                    data["keyboard"]["chars"] = "".join(new_chars)
 
-        # Specchia la hotbar
-        if "hotbar" in data:
-            data["hotbar"] = 8 - data["hotbar"]
+            if "hotbar" in data:
+                data["hotbar"] = 8 - data["hotbar"]
 
-        # Aggiungi la riga specchiata
         mirrored_lines.append(json.dumps(data))
 
-    # Scrivi il nuovo file JSONL
     with open(output_json_path, "w") as outfile:
         outfile.write("\n".join(mirrored_lines) + "\n")
     print(f"JSONL specchiato salvato in: {output_json_path}")
 
-def main():
-    # specchiare i dati del nostro dataset nella stessa cartella
-    # python3 MirrorData.py --input_folder ../MineRLBasaltFindWood-v0 --output_folder ../MineRLBasaltFindWood-v0
 
-    # Parser per gli argomenti da riga di comando
+def main():
     parser = argparse.ArgumentParser(description="Specchia video e JSONL.")
     parser.add_argument("--input_folder", type=str, required=True, help="Cartella di input contenente video e JSONL.")
     parser.add_argument("--output_folder", type=str, required=True, help="Cartella di output per i video e JSONL specchiati.")
@@ -120,53 +116,37 @@ def main():
 
     args = parser.parse_args()
 
-    print(f"Overwrite: {args.overwrite}")
-
     input_folder = args.input_folder
     output_folder = args.output_folder
     overwrite = args.overwrite
 
     os.makedirs(output_folder, exist_ok=True)
 
-    # Trova tutti i file video nella cartella
     video_paths = glob.glob(os.path.join(input_folder, "*.mp4"))
 
     for video_path in video_paths:
         video_name = os.path.basename(video_path)
 
-        # Se un file inizia con "mirorred_" è un file già sepcchiato e non bisogna operarci
-        # condizione utile quanto input_folder == output_folder
-        # evita di specchiare un file già specchiato
         if video_name.startswith("mirrored_"):
-            print(f"File specchiato rilevato e saltato: {video_name}")
             continue
 
         mirrored_video_path = os.path.join(output_folder, f"mirrored_{video_name}")
 
-        # Controlla se il file specchiato esiste già
         if not overwrite and os.path.exists(mirrored_video_path):
-            print(f"File già specchiato: {mirrored_video_path}, salto...")
             continue
 
-        # Specchia il video
-        mirror_video(video_path, mirrored_video_path)
-
-        # Specchia il JSONL corrispondente
         json_name = video_name.replace(".mp4", ".jsonl")
         input_json_path = os.path.join(input_folder, json_name)
         mirrored_json_path = os.path.join(output_folder, f"mirrored_{json_name}")
 
-        if not overwrite and os.path.exists(mirrored_json_path):
-            print(f"File JSONL già specchiato: {mirrored_json_path}, salto...")
-            continue
-
         if os.path.exists(input_json_path):
+            with open(input_json_path, "r") as f:
+                json_data = [json.loads(line) for line in f]
+            mirror_video(video_path, mirrored_video_path, json_data)
             mirror_json(input_json_path, mirrored_json_path, video_path)
         else:
             print(f"Attenzione: JSONL non trovato per {video_name}")
-        
-        #test
-        #break
+
 
 if __name__ == "__main__":
     main()
