@@ -83,8 +83,6 @@ for i in range(samples):
     #env.seed(2143)
   
     obs = env.reset()
-    obs["inventory"] = obs.get("inventory", {})
-    obs["inventory"]["log"] = 5  # Ad esempio, 10 tronchi di legno
 
     done = False
     tick = 0
