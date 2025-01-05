@@ -119,6 +119,7 @@ for i in range(samples):
     
     isGuiOpen = False
     isGuiInventory = False
+    isGuiTriggerActive = False
     current_hotbar = 0
     
     try:
@@ -157,6 +158,8 @@ for i in range(samples):
             for idx, pressed in enumerate(mouse_buttons):
                 if pressed:
                     action.update(mouse_to_action_mapping.get(idx, {}))
+                    if idx == 2 and isGuiTriggerActive:  # Controlla se il tasto destro è premuto e il trigger è attivo
+                        isGuiOpen = True
 
             # Get mouse movement
             mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -185,6 +188,9 @@ for i in range(samples):
                 f"key.keyboard.{pygame.key.name(key)}"
                 for key in key_to_action_mapping.keys() if keys[key]
             ]
+            
+            # Escludi il tasto `x` dalle chiavi registrate
+            keys_pressed = [key for key in keys_pressed if key != "key.keyboard.x"]
 
             # Calcola `newKeys` confrontando con i tasti del ciclo precedente
             new_keys_pressed = [key for key in keys_pressed if key not in previous_keys]
@@ -200,13 +206,21 @@ for i in range(samples):
                     if char:
                         chars += char  # Aggiungi il carattere digitato
                         key_name = f"key.keyboard.{char.lower()}"
-                        if key_name not in new_keys_pressed:
+                        if key_name not in new_keys_pressed and key_name != "key.keyboard.x":
                             new_keys_pressed.append(key_name)  # Aggiungi ai nuovi tasti
                     if event.key == pygame.K_e:
-                        isGuiOpen = not isGuiOpen
-                        isGuiInventory = not isGuiInventory
+                        if(not isGuiTriggerActive):
+                            isGuiOpen = not isGuiOpen
+                            isGuiInventory = not isGuiInventory
+                        else:
+                            isGuiOpen = not isGuiOpen
+                            isGuiTriggerActive = False
+                            
                         reg_mouse_x, reg_mouse_y = (screen.get_width() // 2, screen.get_height() // 2)
                         reg_mouse_x_gui_open, reg_mouse_y_gui_open = (screen.get_width() // 2, screen.get_height() // 2)
+                    elif event.key == pygame.K_x:  # Attiva/disattiva il trigger
+                        isGuiTriggerActive = not isGuiTriggerActive
+                        print(f"Trigger GUI: {'attivo' if isGuiTriggerActive else 'disattivo'}")
 
             # Calcola il server tick
             current_time = pygame.time.get_ticks()
