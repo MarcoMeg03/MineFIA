@@ -6,6 +6,7 @@ import pygame
 import numpy as np
 import os
 from generate_file_utils import generate_file_name
+import register_envs  # Importa il file di registrazione degli ambienti
 
 img_scaling = 0.25
 
@@ -77,7 +78,7 @@ for i in range(samples):
     action_log = []
 
     # Initialize the Minecraft environment
-    env = gym.make('MineRLObtainDiamondShovel-v0')
+    env = gym.make('FIA-Treechop-v0')
 
     #env.seed(2143)
   

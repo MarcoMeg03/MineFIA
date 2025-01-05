@@ -6,6 +6,11 @@ import minerl
 import numpy as np
 import cv2
 
+import sys
+import os
+sys.path.append(os.path.abspath('../'))  # Aggiunge la cartella superiore al PYTHONPATH
+import register_envs  # Importa il file di registrazione degli ambienti
+
 from openai_vpt.agent import MineRLAgent
 
 def main(model, weights, env, n_episodes=1, max_steps=int(1e9), show=True):
