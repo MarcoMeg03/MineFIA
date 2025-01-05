@@ -28,7 +28,8 @@ for i in range(samples):
     VIDEO_OUT_RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
     pygame.display.set_caption('Minecraft')
-    SENS = 0.25
+    SENS = 0.2
+    SENS_INVERSA = 2.5
 
     # Set up the OpenCV video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -81,7 +82,9 @@ for i in range(samples):
     #env.seed(2143)
   
     obs = env.reset()
-   
+    obs["inventory"] = obs.get("inventory", {})
+    obs["inventory"]["log"] = 5  # Ad esempio, 10 tronchi di legno
+
     done = False
     tick = 0
     server_tick = 0
@@ -158,24 +161,25 @@ for i in range(samples):
 
             # Get mouse movement
             mouse_x, mouse_y = pygame.mouse.get_pos()
-            delta_x = mouse_x - prev_mouse_x
+            delta_x = mouse_x - prev_mouse_x 
             delta_y = mouse_y - prev_mouse_y
-            action["camera"] = [delta_y * SENS * (-1), delta_x * SENS * (-1)]
+            action["camera"] = [(delta_y * SENS)* (-1), (delta_x * SENS)* (-1)]
             pygame.mouse.set_pos(screen.get_width() // 2, screen.get_height() // 2)
             prev_mouse_x, prev_mouse_y = screen.get_width() // 2, screen.get_height() // 2
 
             if isGuiOpen:
                 # Aggiorna le coordinate GUI-specifiche
-                reg_mouse_x_gui_open += delta_x * SENS
-                reg_mouse_y_gui_open += delta_y * SENS
+                reg_mouse_x_gui_open -= delta_x * SENS_INVERSA
+                reg_mouse_y_gui_open -= delta_y * SENS_INVERSA
 
                 # Limita le coordinate del cursore alla finestra
                 reg_mouse_x_gui_open = max(0, min(reg_mouse_x_gui_open, RESOLUTION[0] - 1))
                 reg_mouse_y_gui_open = max(0, min(reg_mouse_y_gui_open, RESOLUTION[1] - 1))
             else:
                 # Aggiorna le coordinate normali
-                reg_mouse_x += delta_x * SENS
-                reg_mouse_y += delta_y * SENS    
+                reg_mouse_x -= delta_x * SENS_INVERSA
+                reg_mouse_y -= delta_y * SENS_INVERSA  
+
 
             # Get keys pressed
             keys_pressed = [
@@ -243,7 +247,8 @@ for i in range(samples):
 
             # Aggiorna i pulsanti del frame precedente
             previous_buttons = current_buttons.copy()
-                
+            print(f"{pygame.mouse.get_pos()} posizione registrata (x,y): {reg_mouse_x_gui_open} {reg_mouse_y_gui_open}")
+
             registerAction = {
                 "mouse": {
                     "x": reg_mouse_x_gui_open if isGuiOpen else reg_mouse_x,
