@@ -17,18 +17,16 @@ from openai_vpt.agent import PI_HEAD_KWARGS, MineRLAgent
 from data_loader import DataLoader
 from openai_vpt.lib.tree_util import tree_map
 
-import pandas as pd
-import time
+import matplotlib.pyplot as plt
 from openpyxl import Workbook
 from openpyxl import load_workbook
-from openpyxl.chart import LineChart, Reference
 
 # Originally this code was designed for a small dataset of ~20 demonstrations per task.
 # The settings might not be the best for the full BASALT dataset (thousands of demonstrations).
 # Use this flag to switch between the two settings
 USING_FULL_DATASET = False
 
-EPOCHS = 1 if USING_FULL_DATASET else 2
+EPOCHS = 1 if USING_FULL_DATASET else 3
 # Needs to be <= number of videos
 BATCH_SIZE = 64 if USING_FULL_DATASET else 4
 # Ideally more than batch size to create
@@ -41,7 +39,7 @@ DEVICE = "cpu"
 LOSS_REPORT_RATE = 100
 
 # Tuned with bit of trial and error
-LEARNING_RATE = 0.000181
+LEARNING_RATE = 0.000120
 # OpenAI VPT BC weight decay
 # WEIGHT_DECAY = 0.039428
 WEIGHT_DECAY = 0.0
@@ -62,7 +60,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
     # To create model with the right environment.
-    env = gym.make("MineRLObtainDiamondShovel-v0")
+    env = gym.make("MineRLBasaltFindCave-v0")
     agent = MineRLAgent(env, device=DEVICE, policy_kwargs=agent_policy_kwargs, pi_head_kwargs=agent_pi_head_kwargs)
     agent.load_weights(in_weights)
 
@@ -110,7 +108,6 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     sheet.append(["Time (s)", "Average Loss", "Batches"])  
     workbook.save(log_file)
 
-
     # Keep track of the hidden state per episode/trajectory.
     # DataLoader provides unique id for each episode, which will
     # be different even for the same trajectory when it is loaded
@@ -118,33 +115,35 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     episode_hidden_states = {}
     dummy_first = th.from_numpy(np.array((False,))).to(DEVICE)
 
-    loss_sum = 0
-    for batch_i, (batch_images, batch_actions, batch_episode_id) in enumerate(data_loader):
+    # Configura il grafico interattivo
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_title("Loss Trend in Tempo Reale")
+    ax.set_xlabel("Batch")
+    ax.set_ylabel("Loss Media")
+    line, = ax.plot([], [], label="Loss Media", color="blue", linewidth=2)
+    plt.legend()
+    plt.grid(True)
 
+    # Inizializza i dati per il grafico
+    batch_indices = []
+    avg_losses = []
+    loss_sum = 0
+
+    for batch_i, (batch_images, batch_actions, batch_episode_id) in enumerate(data_loader):
         batch_loss = 0
 
         for image, action, episode_id in zip(batch_images, batch_actions, batch_episode_id):
             if image is None and action is None:
-                # A work-item was done. Remove hidden state
                 if episode_id in episode_hidden_states:
                     removed_hidden_state = episode_hidden_states.pop(episode_id)
                     del removed_hidden_state
                 continue
 
+            # Calcolo e aggiornamento dello stato
             agent_action = agent._env_action_to_agent(action, to_torch=True, check_if_null=True)
             if agent_action is None:
-                # Action was null
                 continue
-
-            # Ottieni l'azione nello spazio MineRL
-            minerl_action_transformed = agent._agent_action_to_env(agent_action)
-
-            # Itera sulle azioni trasformate e stampa solo quelle attive
-            for key, value in minerl_action_transformed.items():
-                if isinstance(value, np.ndarray) and np.all(value == 1):  # Verifica se tutti gli elementi sono 1
-                    print(f"{key}: {value}", end=", ")
-
-            print(" ")
 
             agent_obs = agent._env_obs_to_agent({"pov": image})
             if episode_id not in episode_hidden_states:
@@ -157,28 +156,11 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
                 dummy_first
             )
 
-            log_prob  = policy.get_logprob_of_action(pi_distribution, agent_action)
-
-            with th.no_grad():
-                original_pi_distribution, _, _ = original_policy.get_output_for_observation(
-                    agent_obs,
-                    agent_state,
-                    dummy_first
-                )
-
             log_prob = policy.get_logprob_of_action(pi_distribution, agent_action)
-            kl_div = policy.get_kl_of_action_dists(pi_distribution, original_pi_distribution)
-
-            # Make sure we do not try to backprop through sequence
-            # (fails with current accumulation)
-
-            new_agent_state = tree_map(lambda x: x.detach(), new_agent_state)
-            episode_hidden_states[episode_id] = new_agent_state
-
-            # Finally, update the agent to increase the probability of the
-            # taken action.
-            # Remember to take mean over batch losses
-
+            kl_div = policy.get_kl_of_action_dists(
+                pi_distribution,
+                original_policy.get_output_for_observation(agent_obs, agent_state, dummy_first)[0]
+            )
             loss = (-log_prob + KL_LOSS_WEIGHT * kl_div) / BATCH_SIZE
             batch_loss += loss.item()
             loss.backward()
@@ -189,41 +171,33 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
 
         loss_sum += batch_loss
         if batch_i % LOSS_REPORT_RATE == 0:
-            time_since_start = time.time() - start_time
             avg_loss = loss_sum / LOSS_REPORT_RATE
-            log_message = f"Time: {time_since_start:.2f}, Batches: {batch_i}, Avrg loss: {avg_loss:.4f}"
-            print(log_message)  # Stampa sul terminale
+            batch_indices.append(batch_i)
+            avg_losses.append(avg_loss)
+
+            # Aggiorna i dati del grafico
+            line.set_xdata(batch_indices)
+            line.set_ydata(avg_losses)
+            ax.relim()  # Ricalcola i limiti degli assi
+            ax.autoscale_view()  # Scala automaticamente la vista
+            fig.canvas.draw_idle()
+            plt.pause(0.1)  # Breve pausa per aggiornare il rendering
+
+            loss_sum = 0
+
+            # Stampa i log per verifica
+            print(f"Batch: {batch_i}, Avg Loss: {avg_loss:.4f}")
 
             # Scrivi i dati nel file Excel
             workbook = load_workbook(log_file)
             sheet = workbook["Training Data"]
-            sheet.append([time_since_start, avg_loss, batch_i])  
+            sheet.append([batch_i, avg_loss])
             workbook.save(log_file)
 
-            loss_sum = 0
+    # Chiudi il grafico interattivo dopo l'addestramento
+    plt.ioff()
+    plt.show()
 
-        if batch_i > MAX_BATCHES:
-            break
-
-    state_dict = policy.state_dict()
-    th.save(state_dict, out_weights)
-
-    # Aggiunta del grafico interattivo
-    workbook = load_workbook(log_file)
-    sheet = workbook["Training Data"]
-    chart = LineChart()
-    chart.title = "Loss Trend"
-    chart.x_axis.title = "Time (s)"
-    chart.y_axis.title = "Average Loss"
-
-    data = Reference(sheet, min_col=2, min_row=2, max_row=sheet.max_row)  
-    categories = Reference(sheet, min_col=1, min_row=2, max_row=sheet.max_row)  
-    chart.add_data(data, titles_from_data=False)
-    chart.set_categories(categories)
-
-    # Posizionamento del grafico
-    sheet.add_chart(chart, "E5")
-    workbook.save(log_file)
 
 if __name__ == "__main__":
     parser = ArgumentParser()
