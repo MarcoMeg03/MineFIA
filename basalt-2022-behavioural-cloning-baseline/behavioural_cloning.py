@@ -26,9 +26,9 @@ from openpyxl import load_workbook
 # Use this flag to switch between the two settings
 USING_FULL_DATASET = False
 
-EPOCHS = 1 if USING_FULL_DATASET else 1
+EPOCHS = 1 if USING_FULL_DATASET else 2
 # Needs to be <= number of videos
-BATCH_SIZE = 64 if USING_FULL_DATASET else 6
+BATCH_SIZE = 64 if USING_FULL_DATASET else 5
 # Ideally more than batch size to create
 # variation in datasets (otherwise, you will
 # get a bunch of consecutive samples)
@@ -50,7 +50,7 @@ KL_LOSS_WEIGHT = 0.3
 # MAX_GRAD_NORM = 5.0
 MAX_GRAD_NORM = 5.0
 
-MAX_BATCHES = 2000 if USING_FULL_DATASET else 3000
+MAX_BATCHES = 2000 if USING_FULL_DATASET else int(1e9)
 
 def load_model_parameters(path_to_model_file):
     agent_parameters = pickle.load(open(path_to_model_file, "rb"))
@@ -157,8 +157,6 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
                 agent_state,
                 dummy_first
             )
-
-            log_prob = policy.get_logprob_of_action(pi_distribution, agent_action)
 
             with th.no_grad():
                 original_pi_distribution, _, _ = original_policy.get_output_for_observation(
