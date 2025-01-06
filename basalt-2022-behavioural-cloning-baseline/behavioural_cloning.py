@@ -26,28 +26,31 @@ from openpyxl import load_workbook
 # Use this flag to switch between the two settings
 USING_FULL_DATASET = False
 
-EPOCHS = 1 if USING_FULL_DATASET else 3
+EPOCHS = 1 if USING_FULL_DATASET else 1
 # Needs to be <= number of videos
-BATCH_SIZE = 64 if USING_FULL_DATASET else 4
+BATCH_SIZE = 64 if USING_FULL_DATASET else 6
 # Ideally more than batch size to create
 # variation in datasets (otherwise, you will
 # get a bunch of consecutive samples)
 # Decrease this (and batch_size) if you run out of memory
-N_WORKERS = 100 if USING_FULL_DATASET else 4
+N_WORKERS = 100 if USING_FULL_DATASET else 6
 DEVICE = "cpu"
 
 LOSS_REPORT_RATE = 100
 
 # Tuned with bit of trial and error
-LEARNING_RATE = 0.000120
+# LEARNING_RATE = 0.000181
+LEARNING_RATE = 0.000150
 # OpenAI VPT BC weight decay
 # WEIGHT_DECAY = 0.039428
-WEIGHT_DECAY = 0.0
+WEIGHT_DECAY = 0.039428/3
 # KL loss to the original model was not used in OpenAI VPT
-KL_LOSS_WEIGHT = 1.0
+# KL_LOSS_WEIGHT = 1.0
+KL_LOSS_WEIGHT = 0.3
+# MAX_GRAD_NORM = 5.0
 MAX_GRAD_NORM = 5.0
 
-MAX_BATCHES = 2000 if USING_FULL_DATASET else int(1e9)
+MAX_BATCHES = 2000 if USING_FULL_DATASET else 3000
 
 def load_model_parameters(path_to_model_file):
     agent_parameters = pickle.load(open(path_to_model_file, "rb"))
@@ -98,8 +101,6 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         n_epochs=EPOCHS,
     )
 
-    start_time = time.time()
-
     # File Excel
     log_file = "training_loss_log.xlsx"
     workbook = Workbook()
@@ -146,6 +147,7 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
                 continue
 
             agent_obs = agent._env_obs_to_agent({"pov": image})
+            
             if episode_id not in episode_hidden_states:
                 episode_hidden_states[episode_id] = policy.initial_state(1)
             agent_state = episode_hidden_states[episode_id]
@@ -157,10 +159,27 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
             )
 
             log_prob = policy.get_logprob_of_action(pi_distribution, agent_action)
-            kl_div = policy.get_kl_of_action_dists(
-                pi_distribution,
-                original_policy.get_output_for_observation(agent_obs, agent_state, dummy_first)[0]
-            )
+
+            with th.no_grad():
+                original_pi_distribution, _, _ = original_policy.get_output_for_observation(
+                    agent_obs,
+                    agent_state,
+                    dummy_first
+                )
+
+            log_prob = policy.get_logprob_of_action(pi_distribution, agent_action)
+            kl_div = policy.get_kl_of_action_dists(pi_distribution, original_pi_distribution)
+            
+            # Make sure we do not try to backprop through sequence
+            # (fails with current accumulation)
+
+            new_agent_state = tree_map(lambda x: x.detach(), new_agent_state)
+            episode_hidden_states[episode_id] = new_agent_state
+
+            # Finally, update the agent to increase the probability of the
+            # taken action.
+            # Remember to take mean over batch losses
+
             loss = (-log_prob + KL_LOSS_WEIGHT * kl_div) / BATCH_SIZE
             batch_loss += loss.item()
             loss.backward()
@@ -194,10 +213,15 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
             sheet.append([batch_i, avg_loss])
             workbook.save(log_file)
 
+        if batch_i > MAX_BATCHES:
+            break
+
+    state_dict = policy.state_dict()
+    th.save(state_dict, out_weights)
+
     # Chiudi il grafico interattivo dopo l'addestramento
     plt.ioff()
     plt.show()
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()
