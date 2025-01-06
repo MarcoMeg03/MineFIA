@@ -24,7 +24,7 @@ for i in range(samples):
     # Constants
     OUTPUT_VIDEO_FILE = f"./data/InCostruzione/{file_base_name}.mp4"
     ACTION_LOG_FILE = f"./data/InCostruzione/{file_base_name}.jsonl"
-    FPS = 30
+    FPS = 20
     RESOLUTION = (1280, 720)  # Resolution at which to capture and save the video
     VIDEO_OUT_RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
     screen = pygame.display.set_mode(RESOLUTION)
