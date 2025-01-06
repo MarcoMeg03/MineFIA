@@ -126,11 +126,12 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
         obs = env.reset()
         prev_inventory = {key: 0 for key in MATERIAL_REWARDS.keys()}
         
-        jump_window = deque(maxlen=20)
-        inventory_reward_given = False
+        jump_window = deque(maxlen=20)  # Finestra mobile per i salti
+        inventory_reward_given = False  # Flag per la reward di inventario
         isInventoryOpen = False
         
         cumulative_episode_reward = 0
+        cumulative_reward = 0
         episode_rewards = []  # Salva le reward per ogni passo
         steps = []  # Salva i passi per il grafico
 
@@ -226,6 +227,12 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
                 batch_rewards = []
                 batch_log_probs = []
                 batch_advantages = []
+                
+            elif (step + 1) % 10 == 0:
+                # Reset dei batch
+                batch_rewards = []
+                batch_log_probs = []
+                batch_advantages = []
 
             if show:
                 env.render()
@@ -264,6 +271,7 @@ def main(model, weights, env, n_episodes=3, max_steps=int(1e9), show=True):
     plt.savefig("./data/Stats/RLTranding_reward/cumulative_reward_trend_all_episodes.png")
     plt.show()
 
+    # Salva i pesi aggiornati
     state_dict = agent.policy.state_dict()
     th.save(state_dict, "ppo_updated_weights_rmsprop.weights")
 
