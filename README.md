@@ -1,4 +1,4 @@
-# MineFIA - AI per Task in Minecraft
+# MineFIA - Progetto corse per il corso di Fondamenti di Intelligenza Artificiale
 
 ## Introduzione
 **MineFIA** è un progetto sviluppato nell'ambito del corso di Fondamenti di Intelligenza Artificiale, che utilizza la libreria [MineRL](https://minerl.io/) per creare agenti AI in grado di completare task complessi in ambienti Minecraft. Questo progetto si concentra sull'addestramento tramite Behavioural Cloning,Reinforcement learning con l'aggiunta di funzioni di reward che includono informazioni dall'inventario e Renforcement learning con feedback umani.
