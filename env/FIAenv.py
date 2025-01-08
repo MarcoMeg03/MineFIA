@@ -10,6 +10,9 @@ from minerl.herobraine.hero import handlers, mc
 from minerl.herobraine.env_specs.basalt_specs import BasaltBaseEnvSpec
 from minerl.env import _singleagent
 from minerl.herobraine.env_specs.basalt_specs import BasaltTimeoutWrapper, DoneOnESCWrapper
+from minerl.herobraine.hero.mc import ALL_ITEMS
+from minerl.herobraine.hero.handler import Handler
+
 
 from minerl.herobraine.env_specs.human_controls import HumanControlEnvSpec
 
@@ -18,13 +21,7 @@ MINUTE = 20 * 60  # 20 tick per secondo * 60 secondi
 
 class FIATreechopEnvSpec(BasaltBaseEnvSpec):
     """
-    .. image:: ../assets/fia/treechop.gif
-      :scale: 100 %
-      :alt:
-    
-    Dopo essere spawnato in una foresta, l'obiettivo è abbattere almeno 5 alberi. 
-    Ogni albero deve essere completamente rimosso (tutti i blocchi di tronco tagliati).
-    Termina l'episodio impostando l'azione "ESC" a 1.
+
     """
 
     def __init__(self):
@@ -34,13 +31,30 @@ class FIATreechopEnvSpec(BasaltBaseEnvSpec):
             max_episode_steps=3*MINUTE,
             preferred_spawn_biome="forest",
             inventory=[
-                dict(type="iron_axe", quantity=1),
-                dict(type="stone_pickaxe", quantity=1),
-                dict(type="oak_sapling", quantity=10),
-                dict(type="bone_meal", quantity=32),
+                #dict(type="oak_log", quantity=5),
             ],
         )
+    def create_mission_handlers(self):
+        # Aggiunge gestori per osservazioni e azioni pertinenti
+        return super().create_mission_handlers() + [
+            handlers.InventoryObservation(["log", "planks", "crafting_table"]),
+            handlers.CraftingAction(["planks", "crafting_table"]),
+            handlers.FlatInventoryObservation(["log", "planks", "crafting_table"]),
+        ]
 
+    def determine_success_from_rewards(self, rewards: List[float]) -> bool:
+        # Definisce il successo se il banco da lavoro è costruito
+        return "crafting_table" in self.current_observation.get("inventory", {}) and \
+               self.current_observation["inventory"]["crafting_table"] >= 1
+
+    def create_observables(self) -> List[Handler]:
+        return [
+            handlers.POVObservation(self.resolution),
+            handlers.FlatInventoryObservation(ALL_ITEMS)
+        ]
+
+
+    @staticmethod
     def fia_treechop_entrypoint():
         from env.FIAenv import FIATreechopEnvSpec  # Assicurati che il percorso sia corretto
         env_spec = FIATreechopEnvSpec()
