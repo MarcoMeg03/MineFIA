@@ -54,7 +54,13 @@ python train.py
 
 ### Training per rinforzo
 ```bash
-python train.py
+ python rf_learning.py --weights ./train/MineRLBasaltFindWood.weights --model ./data/VPT-models/foundation-model-1x.model --env FIA-Treechop-v0 --show --max-steps 5000 --episodes 7
+```
+
+### Training per rinforzo con feedback umani
+cliccando "+" e "-" si possono dare reward al modello in fase di esecuzione
+```bash
+python rl_human_feedback.py --weights ./train/MineRLBasaltFindWood.weights --model ./data/VPT-models/foundation-model-1x.model --env FIA-Treechop-v0 --show --max-steps 5000 --episodes 7
 ```
 
 ## Dataset
