@@ -47,7 +47,6 @@ MarkupSafe==3.0.2
 matplotlib==3.9.2
 matplotlib-inline==0.1.7
 mcrcon==0.7.0
-minerl==1.0.2
 minio==7.2.13
 moderngl==5.12.0
 mpmath==1.3.0
