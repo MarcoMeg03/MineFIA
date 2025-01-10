@@ -81,12 +81,13 @@ In modo da eseguire una serie di episodi, sul terminale stamperà gli ogetti in 
 
 ## Esecuzione del Progetto
 ### Esecuzione di un modello pre addestrato
-Una volta addestrato il tuo modello non ti basterà altro che eseguire `run_agent.py` nel seguente modo, specificando il modello da usare, pesi generati dall'addestramento e ambiente in cui svolgere il task:
+Una volta addestrato il tuo modello non ti basterà altro che eseguire `run_agent.py` nel seguente modo, specificando il modello da usare, pesi generati dall'addestramento e ambiente in cui svolgere il task, sarà poi avviata una finestra MineRL in cui potrai vedere il tuo agente agire nel mondo di Minecraft:
 ```bash
  python run_agent.py --weights ./train/MineRLBasaltFindWood.weights --model ./data/VPT-models/foundation-model-1x.model --env FIA-Treechop-v0 --show
 ```
 ### Training per imitazione
-Per addestrare un agente per imitazione del comportamento su un task specifico, esegui:<br>
+Per addestrare un agente per imitazione del comportamento esegui il seguente file come mostrato.<br>
+Oltre ad avviare l'addestramento si aprirà un grafico che mostrerà l'andamento della loss in tempo reale, così sarà possibile rendersi conto dell'andamento dell'addestramento in qualsiasi momento:<br>
 (assicurati di aver impostato il modello e i pesi desiderati prima di avviare un addestramento, puoi<br>
 farlo editando il file `train.py`)
 ```bash
@@ -94,7 +95,8 @@ python train.py
 ```
 
 ### Training per rinforzo
-Come detto inizialmente abbiamo creato una funzione di reward ad hoc per il nostro task che attribuisce punteggi all'agente ogni volta che raccoglie uno di questi items:
+Come detto inizialmente abbiamo creato una funzione di reward ad hoc per il nostro task che attribuisce punteggi all'agente ogni volta che raccoglie uno di questi items:<br>
+(anche in questo caso all'avvio dell'addestramento sarà presente un grafico che mostrerà l'andamento in tempo reale della reward attribuita, oltre l'effettiva finestra di gioco per visualizzare le azioni in tempo reale)
 ```python
 MATERIAL_REWARDS = {
     "birch_log": 1.2,
@@ -154,9 +156,14 @@ python manual_recorder.py
 Per aumentare la quantità di dati abbiamo deciso di implementare uno script capace di specchiare i video e le azioni correlate ad ogni fotogramma,
 non vengono specchiati fotogrammi che potrebbero causare problemi (es. non viene specchiato quando la GUI è aperta)
 ```bash
-python MirrorData.py --input_folder ./path --output_folder ./path
+python MirrorData.py --input_folder ./path-videos-to-mirror --output_folder ./path-to-save-mirrored-videos
 ```
-
+### Data Quality
+Per verificare la qualità dei dati è stato creato lo script `visualize_mouse_movement.py`, ci ha permesso di accertarci che i movimenti del mouse registrati nel JSONL fossero coerenti con gli spostamenti effettivi nei video.
+Semplicemente lo script mostra a video le coordinate riportate nel JSONL, eseguibile con:
+```bash
+python visualize_mouse_movement.py ./path-to-JSONL-file
+```
 ## Licenza
 Questo progetto è rilasciato sotto la licenza MIT. Consulta il file `LICENSE` per maggiori dettagli.
 
