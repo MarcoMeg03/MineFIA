@@ -13,7 +13,7 @@ Il nostro contributo all'interno di questo progetto è stato **ampliare la libre
 ## Usa la nostra macchina docker
   Abbiamo predisposto per te una fantastica macchina docker<br>
   che ti eviterà di passare quello che abbiamo passato noi per utilizzare il framework MineRL!<br>
-  Puoi trovarla [qui](URL).
+  Puoi trovarla [qui](https://hub.docker.com/r/giusopo/minefia).
 
 ## Installazione Manuale
   Ad ogni modo, se preferisci creare un tuo ambiente manualmente non ho niente in contrario!<br>
