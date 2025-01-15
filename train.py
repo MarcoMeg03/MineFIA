@@ -1,4 +1,4 @@
-from behavioural_cloning import behavioural_cloning_train
+from training.behavioural_cloning import behavioural_cloning_train
 
 def main():
     print("===Training Find wood model===")

@@ -8,7 +8,7 @@ import cv2
 
 import sys
 import os
-sys.path.append(os.path.abspath('../'))  # Aggiunge la cartella superiore al PYTHONPATH
+#sys.path.append(os.path.abspath('../'))  # Aggiunge la cartella superiore al PYTHONPATH
 import register_envs  # Importa il file di registrazione degli ambienti
 
 from openai_vpt.agent import MineRLAgent
