@@ -1,0 +1,6 @@
+FROM giusopo/minefia:latest
+
+# Rimuovi il contenuto esistente in /app e clona la repository
+WORKDIR /app
+RUN rm -rf /app/* && git clone https://github.com/MarcoMeg03/MineFIA.git .
+
