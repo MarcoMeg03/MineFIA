@@ -5,7 +5,11 @@ import json
 import pygame
 import numpy as np
 import os
-from generate_file import generate_file_name
+from utils.generate_file import generate_file_name
+import sys
+import os
+sys.path.append(os.path.abspath('../../'))
+
 import register_envs  # Importa il file di registrazione degli ambienti
 
 img_scaling = 0.25
@@ -22,8 +26,8 @@ for i in range(samples):
     file_base_name = f"FIA_{generate_file_name()}"
     
     # Constants
-    OUTPUT_VIDEO_FILE = f"./data/CreatedVideos/{file_base_name}.mp4"
-    ACTION_LOG_FILE = f"./data/CreatedVideos/{file_base_name}.jsonl"
+    OUTPUT_VIDEO_FILE = f"./in_costruzione/{file_base_name}.mp4"
+    ACTION_LOG_FILE = f"./in_costruzione/{file_base_name}.jsonl"
     FPS = 20
     RESOLUTION = (1280, 720)  # Resolution at which to capture and save the video
     VIDEO_OUT_RESOLUTION = (640, 360)  # Resolution at which to capture and save the video
