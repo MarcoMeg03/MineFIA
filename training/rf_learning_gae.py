@@ -229,12 +229,13 @@ def main(model, weights, env, n_episodes=3, max_steps=2000, show=True):
                 # Dopo l'aggiornamento, salva i log-probabilities attuali come riferimento
                 old_log_probs = [lp.detach() for lp in log_probs]  # Usa `.detach()` per evitare errori
 
-                total_loss = loss_clip
-
                 optimizer.zero_grad()
-                total_loss.backward()
+                loss_clip.backward()
+                th.nn.utils.clip_grad_norm_(agent.policy.parameters(), max_norm=1.0)
                 optimizer.step()
+                scheduler.step()
 
+                # Reset dei batch
                 rewards = []
                 values = []
                 log_probs = []
