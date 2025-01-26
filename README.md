@@ -17,7 +17,9 @@ L'obiettivo e fare in modo che l'agente porti a termine le primissime fasi di gi
 
 ## Installazione Manuale
   Ad ogni modo, se preferisci creare un tuo ambiente manualmente non ho niente in contrario!<br>
-  Anzi, ecco dei semplici passi che dovrebbero guidarti nella creazione di un ambiente adatto a questo progetto.
+  Anzi, ecco dei semplici passi che dovrebbero guidarti nella creazione di un ambiente adatto a questo progetto.<br>
+  
+  Se vuoi avventurarti in una fantastica esperienza masochista, oppure vuoi fare un torto al tuo peggior nemico puoi provare ad installare il framework su Windows e/o MacOS.
   
 - **Clona la Repository**:
   ```bash
@@ -26,7 +28,7 @@ L'obiettivo e fare in modo che l'agente porti a termine le primissime fasi di gi
   ```
   
 - **Crea un ambiente virtuale:**<br>
-  Puoi usare le versioni di python che vanno dalla 3.8 alla 3.10, personalmente abbiamo scelto 3.10<br>
+  Puoi usare le versioni di python che vanno dalla 3.8 alla 3.10(consigliato), personalmente abbiamo scelto 3.10<br>
   (assicurati di usare questa versione quando creerai il tuo ambiente):
   ```bash
     sudo apt install python3.10
