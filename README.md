@@ -70,7 +70,9 @@ if TEST_x10_1500_STEP:
     n_episodes = 10
     max_steps = 1500
 ```
-In modo da eseguire una serie di episodi, sul terminale stamperà gli ogetti in possesso dell'agente al termine di ogni episodio (speriamo di stamparli in un file excel per poter generare delle statistiche in merito il prima possibile :smiling_face_with_tear:)
+In modo da eseguire una serie di episodi, sul terminale stamperà gli ogetti in possesso dell'agente al termine di ogni episodio.
+
+Altri tipologie di test, come monitorare l'errore non si sono dimostrati metodi efficaci, siccome l'agente in un dato momento puo eseguire N azioni valide e diverse dal comportamento atteso, il metodo migliore per testare il modello è stato mediante un giudizio umano, sulla base degli oggetti ottenuti e sul quanto le sue azioni siano "ragionate".
 ```bash
  python run_agent.py --weights ./train/MineRLBasaltFindWood.weights --model ./data/VPT-models/foundation-model-1x.model --env FIA-Treechop-v0 --show
 ```
