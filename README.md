@@ -64,7 +64,7 @@ Il progetto include i seguenti file principali:
 - **`FIAenv.py`**: Implementazione dell'ambiente.
 
 ### Testing
-Non abbiamo previsto un vero e proprio testing, ma prima di eseguire l'agente è possibile impostare a `True` il booleano `TEST_x10_1500_STEP` e modificare a piacimento 
+Prima di eseguire l'agente è possibile impostare a `True` il booleano `TEST_x10_1500_STEP` e modificare a piacimento 
 ```python
 if TEST_x10_1500_STEP:
     n_episodes = 10
@@ -72,7 +72,7 @@ if TEST_x10_1500_STEP:
 ```
 In modo da eseguire una serie di episodi, sul terminale stamperà gli ogetti in possesso dell'agente al termine di ogni episodio.
 
-Altri tipologie di test, come monitorare l'errore non si sono dimostrati metodi efficaci, siccome l'agente in un dato momento puo eseguire N azioni valide e diverse dal comportamento atteso, il metodo migliore per testare il modello è stato mediante un giudizio umano, sulla base degli oggetti ottenuti e sul quanto le sue azioni siano "ragionate".
+Altri tipologie di test, come monitorare l'errore non si sono dimostrati metodi efficaci, siccome l'agente in un dato momento puo eseguire N azioni valide e diverse dal comportamento atteso, il metodo migliore per testare il modello è stato mediante un giudizio umano, sulla base degli oggetti ottenuti e sul quanto le sue azioni appaiano "ragionate".
 ```bash
  python run_agent.py --weights ./train/MineRLBasaltFindWood.weights --model ./data/VPT-models/foundation-model-1x.model --env FIA-Treechop-v0 --show
 ```
@@ -83,13 +83,13 @@ Altri tipologie di test, come monitorare l'errore non si sono dimostrati metodi 
 
 ## Esecuzione del Progetto
 ### Esecuzione di un modello pre addestrato
-Una volta addestrato il tuo modello non ti basterà altro che eseguire `run_agent.py` nel seguente modo, specificando il modello da usare, pesi generati dall'addestramento e ambiente in cui svolgere il task, sarà poi avviata una finestra MineRL in cui potrai vedere il tuo agente agire nel mondo di Minecraft:
+Una volta addestrato il tuo modello non ti basterà altro che eseguire `run_agent.py` nel seguente modo, specificando il modello da usare, i pesi da utilizzare e ambiente in cui svolgere il task (FIA-Treechop-v0), apparirà una finestra, e mediante una particolare versione di minecraft integrata in MineRL potrai vedere l'agente agire nel mondo di Minecraft:
 ```bash
  python run_agent.py --weights ./train/MineRLBasaltFindWood.weights --model ./data/VPT-models/foundation-model-1x.model --env FIA-Treechop-v0 --show
 ```
 ### Training per imitazione
 Per addestrare un agente per imitazione del comportamento esegui il seguente file come mostrato.<br>
-Oltre ad avviare l'addestramento si aprirà un grafico che mostrerà l'andamento della loss in tempo reale, così sarà possibile rendersi conto dell'andamento dell'addestramento in qualsiasi momento:<br>
+Durante l'addestramento verra visualizzato sul terminale, e stasmpato su un file excel il valore della funzione di loss. così sarà possibile rendersi conto dell'andamento dell'addestramento in qualsiasi momento:<br>
 (assicurati di aver impostato il modello e i pesi desiderati prima di avviare un addestramento, puoi<br>
 farlo editando il file `train.py`)
 ```bash
@@ -101,19 +101,19 @@ Come detto inizialmente abbiamo creato una funzione di reward ad hoc per il nost
 (anche in questo caso all'avvio dell'addestramento sarà presente un grafico che mostrerà l'andamento in tempo reale della reward attribuita, oltre l'effettiva finestra di gioco per visualizzare le azioni in tempo reale)
 ```python
 MATERIAL_REWARDS = {
-    "birch_log": 1.2,
-    "dark_oak_log": 1.2,
-    "jungle_log": 1.2,
-    "oak_log": 1.2,
-    "spruce_log": 1.2,
-    "dark_oak_planks": 1.5,
-    "jungle_planks": 1.5,
-    "oak_planks": 1.5,
-    "spruce_planks": 1.5,
-    "crafting_table": 2.0, 
-    "dirt": -0.2,
-    "gravel": -0.5,
-    "sand": -0.3
+    "birch_log": 0.2,
+    "dark_oak_log": 0.2,
+    "jungle_log": 0.2,
+    "oak_log": 0.2,
+    "spruce_log": 0.2,
+    "dark_oak_planks": 0.4,
+    "jungle_planks": 0.4,
+    "oak_planks": 0.4,
+    "spruce_planks": 0.4,
+    "crafting_table": 0.6, 
+    "dirt": -0.01,
+    "gravel": -0.01,
+    "sand": -0.01
 }
 ```
 In modo che una volta appresi i comportamenti desiderati l'agente possa specializzarsi sempre di più in merito alla risoluzione del suo task e correggere alcuni comportamenti indesiderati:
