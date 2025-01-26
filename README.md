@@ -5,10 +5,10 @@
 Il nostro contributo all'interno di questo progetto è stato **ampliare la libreria originale** tramite lo sviluppo di script per aumentare i dati di addestramento, implementare un apprendimento per rinforzo che utilizza una funzione di reward creata da noi e con feedback umani, oltre che al definire completamente un nuovo task con insieme un nuovo ambiente `(FIA-Treechop-v0)` adatto al suo svolgimento.
 
 ## Funzionalità Principali
+L'obiettivo e fare in modo che l'agente porti a termine le primissime fasi di gioco nella maniera più rapida e "razionale" possibile.
 - **Definizione di un nuovo task** che include:
-  - Raccogliere tronchi di legno
+  - Raccogliere tronchi di legno di ogni tipo
   - Costruire assi di legno 
-  - Costruire un banco da lavoro
 
 ## Usa la nostra macchina docker
   Abbiamo predisposto per te una fantastica macchina docker<br>
